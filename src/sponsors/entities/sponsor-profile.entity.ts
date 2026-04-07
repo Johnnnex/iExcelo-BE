@@ -2,7 +2,6 @@ import { Entity, Column, OneToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Sponsorship } from './sponsorship.entity';
 import { Donation } from './donation.entity';
-import { Message } from './message.entity';
 import { SponsorUrl } from './sponsor-url.entity';
 import { SponsorStudentInvite } from './sponsor-student-invite.entity';
 import { Giveback } from './giveback.entity';
@@ -41,9 +40,6 @@ export class SponsorProfile extends BaseEntity {
 
   @OneToMany(() => Donation, (donation) => donation.sponsor)
   donations: Donation[];
-
-  @OneToMany(() => Message, (message) => message.sponsor)
-  messages: Message[];
 
   @OneToMany(() => Transaction, (transaction) => transaction.sponsor)
   transactions: Transaction[];

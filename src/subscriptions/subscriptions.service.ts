@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository, Not, LessThan, MoreThan, Between, In } from 'typeorm';
@@ -34,7 +34,7 @@ import {
 } from '../../types';
 
 @Injectable()
-export class SubscriptionsService implements OnModuleInit {
+export class SubscriptionsService {
   constructor(
     @InjectRepository(Subscription)
     private subscriptionRepo: Repository<Subscription>,
@@ -53,36 +53,6 @@ export class SubscriptionsService implements OnModuleInit {
     private analyticsService: AnalyticsService,
     private affiliatesService: AffiliatesService,
   ) {}
-
-  // Seed regions and plans on module initialization
-  async onModuleInit() {
-    await this.seedRegions();
-    await this.seedPlans();
-  }
-
-  private async seedRegions() {
-    const existingCount = await this.regionCurrencyRepo.count();
-    if (existingCount > 0) return;
-
-    const regions = regionsData.map((region) =>
-      this.regionCurrencyRepo.create({ ...region, isActive: true }),
-    );
-    await this.regionCurrencyRepo.save(regions);
-
-    // Add default region
-    const defaultRegionEntity = this.regionCurrencyRepo.create({
-      ...defaultRegion,
-      isActive: true,
-    });
-    await this.regionCurrencyRepo.save(defaultRegionEntity);
-  }
-
-  private async seedPlans() {
-    const existingCount = await this.planRepo.count();
-    if (existingCount > 0) return;
-
-    await this.createPlansForAllExamTypes();
-  }
 
   /**
    * Force reseed all subscription plans and prices.
@@ -757,7 +727,7 @@ export class SubscriptionsService implements OnModuleInit {
    */
   async cancelSubscription(
     subscriptionId: string,
-    userId: string,
+    _userId: string,
   ): Promise<void> {
     const subscription = await this.subscriptionRepo.findOne({
       where: { id: subscriptionId },
@@ -779,26 +749,6 @@ export class SubscriptionsService implements OnModuleInit {
    */
   // ─── Sponsor-specific queries ─────────────────────────────────────────────
 
-  /** Count active sponsored subscriptions expiring within the next N days. */
-  async countExpiringSponsoredSubscriptions(
-    sponsorId: string,
-    days = 10,
-  ): Promise<number> {
-    const now = new Date();
-    const cutoff = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-
-    // Count giveback batches expiring soon — mirrors the giveback page exactly.
-    return givebackRepo.count({
-      where: {
-        sponsorId,
-        status: GivebackStatus.ACTIVE,
-        hasResubbed: false,
-        endDate: Between(now, cutoff),
-      },
-    });
-  }
-
   /** Paginated list of sponsor-funded subscriptions with plan & examType. */
   async getSponsoredSubscriptions(
     sponsorId: string,
@@ -813,33 +763,6 @@ export class SubscriptionsService implements OnModuleInit {
       order: { createdAt: 'DESC' },
     });
     return { subscriptions, total };
-  }
-
-  /** Get total giveback count for a sponsor (from giveback table via entity manager). */
-  async getSponsoredGivebackCount(sponsorId: string): Promise<number> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-    return givebackRepo.count({ where: { sponsorId } });
-  }
-
-  /** Returns % change in givebacks: this calendar month vs last calendar month. */
-  async getGivebacksMonthlyChange(sponsorId: string): Promise<number> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-    const now = new Date();
-    const thisStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-
-    const [thisMonth, lastMonth] = await Promise.all([
-      givebackRepo.count({
-        where: { sponsorId, createdAt: Between(thisStart, now) as any },
-      }),
-      givebackRepo.count({
-        where: { sponsorId, createdAt: Between(lastStart, lastEnd) as any },
-      }),
-    ]);
-
-    if (lastMonth === 0) return thisMonth > 0 ? 100 : 0;
-    return Math.round(((thisMonth - lastMonth) / lastMonth) * 100);
   }
 
   /** Stats for the Giveback History page cards. */
@@ -900,8 +823,7 @@ export class SubscriptionsService implements OnModuleInit {
 
     // Count givebacks expiring within 10 days that haven't been resubbed yet
     // Uses giveback.status + endDate directly — set when payment is verified (no join needed)
-    const givebackRepo2 = this.subscriptionRepo.manager.getRepository(Giveback);
-    const expiringSoon = await givebackRepo2
+    const expiringSoon = await givebackRepo
       .createQueryBuilder('g')
       .where('g.id IN (:...givebackIds)', { givebackIds })
       .andWhere('g.status = :gStatus', { gStatus: GivebackStatus.ACTIVE })
@@ -917,19 +839,6 @@ export class SubscriptionsService implements OnModuleInit {
       studentsSponsored,
       expiringSoon,
     };
-  }
-
-  /** Get recent givebacks for sponsor dashboard (populated with subscription data). */
-  async getRecentSponsoredGivebacks(
-    sponsorId: string,
-    limit = 4,
-  ): Promise<Giveback[]> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-    return givebackRepo.find({
-      where: { sponsorId },
-      order: { createdAt: 'DESC' },
-      take: limit,
-    });
   }
 
   /** Paginated giveback history for sponsor, each row enriched with first linked subscription summary. */
@@ -1055,12 +964,6 @@ export class SubscriptionsService implements OnModuleInit {
         return { ...gb, subscriptions: subs, earliestExpiry: gb.endDate };
       }),
     );
-  }
-
-  /** Mark a giveback as having been resubbed. */
-  async markGivebackResubbed(givebackId: string): Promise<void> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-    await givebackRepo.update({ id: givebackId }, { hasResubbed: true });
   }
 
   /** Delete all PENDING subscriptions linked to a giveback (cleanup on Paystack init failure). */
@@ -1394,7 +1297,7 @@ export class SubscriptionsService implements OnModuleInit {
     // Map plans with prices in the detected currency
     const plansWithPrices = plans.map((plan) => {
       const priceRecord = plan.prices?.find(
-        (p) => p.currency === regionCurrency!.currency && p.isActive,
+        (p) => p.currency === regionCurrency.currency && p.isActive,
       );
 
       return {

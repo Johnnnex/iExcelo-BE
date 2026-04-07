@@ -9,7 +9,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
+import { DAY_MS } from '../common/constants';
 import * as crypto from 'crypto';
 import { nanoid } from 'nanoid';
 import { SponsorProfile } from './entities/sponsor-profile.entity';
@@ -32,7 +33,6 @@ import {
   GivebackType,
   GivebackStatus,
   PaymentProvider,
-  Currency,
   TransactionType,
 } from '../../types';
 
@@ -338,10 +338,12 @@ export class SponsorsService {
     const rows = students.map((s) => ({
       id: s.id,
       userId: s.userId,
+      /* eslint-disable @typescript-eslint/no-unsafe-member-access */
       firstName: (s as any).user?.firstName ?? '',
       lastName: (s as any).user?.lastName ?? '',
       email: (s as any).user?.email ?? '',
       isActive: (s as any).user?.isActive ?? false,
+      /* eslint-enable @typescript-eslint/no-unsafe-member-access */
       isSponsored: s.isSponsored,
       defaultExamTypeId: s.defaultExamTypeId,
       createdAt: s.createdAt,
@@ -359,10 +361,7 @@ export class SponsorsService {
     const [total, active, expiringSoon, monthlyStats] = await Promise.all([
       this.studentsService.countSponsoredStudents(sponsorProfile.id),
       this.studentsService.countActiveSponsoredStudents(sponsorProfile.id),
-      this.subscriptionsService.countExpiringSponsoredSubscriptions(
-        sponsorProfile.id,
-        10,
-      ),
+      this.countExpiringSponsoredSubscriptions(sponsorProfile.id, 10),
       this.studentsService.getSponsoredStudentMonthlyStats(sponsorProfile.id),
     ]);
 
@@ -406,14 +405,11 @@ export class SponsorsService {
       recentGivebacks,
       recentStudents,
     ] = await Promise.all([
-      this.subscriptionsService.getSponsoredGivebackCount(sponsorProfile.id),
-      this.subscriptionsService.getGivebacksMonthlyChange(sponsorProfile.id),
+      this.getSponsoredGivebackCount(sponsorProfile.id),
+      this.getGivebacksMonthlyChange(sponsorProfile.id),
       this.getStudentStats(sponsorUserId),
       this.studentsService.getSponsoredExamStats(sponsorProfile.id),
-      this.subscriptionsService.getRecentSponsoredGivebacks(
-        sponsorProfile.id,
-        4,
-      ),
+      this.getRecentSponsoredGivebacks(sponsorProfile.id, 4),
       this.studentsService.getRecentSponsoredStudents(sponsorProfile.id, 5),
     ]);
 
@@ -439,10 +435,12 @@ export class SponsorsService {
       recentGivebacks: populatedGivebacks,
       recentStudents: recentStudents.map((s) => ({
         id: s.id,
+        /* eslint-disable @typescript-eslint/no-unsafe-member-access */
         firstName: (s as any).user?.firstName ?? '',
         lastName: (s as any).user?.lastName ?? '',
         email: (s as any).user?.email ?? '',
         isActive: (s as any).user?.isActive ?? false,
+        /* eslint-enable @typescript-eslint/no-unsafe-member-access */
         defaultExamTypeId: s.defaultExamTypeId,
         createdAt: s.createdAt,
       })),
@@ -739,7 +737,7 @@ export class SponsorsService {
           sponsorId: sponsorProfile.id,
           givebackId: savedGiveback.id,
           provider: PaymentProvider.PAYSTACK,
-          currency: planPrice.currency as Currency,
+          currency: planPrice.currency,
           amount: planPrice.amount,
         }),
       ),
@@ -1032,7 +1030,7 @@ export class SponsorsService {
       sponsorId: sponsorProfile.id,
       type: GivebackType.SUBSCRIPTION,
       amount: totalAmount,
-      currency: planPrice.currency as Currency,
+      currency: planPrice.currency,
       studentCount: eligibleCount,
       parentGivebackId: data.originalGivebackId,
     });
@@ -1050,7 +1048,7 @@ export class SponsorsService {
           sponsorId: sponsorProfile.id,
           givebackId: savedNewGiveback.id,
           provider: PaymentProvider.PAYSTACK,
-          currency: planPrice.currency as Currency,
+          currency: planPrice.currency,
           amount: planPrice.amount,
         }),
       ),
@@ -1100,9 +1098,7 @@ export class SponsorsService {
     }
 
     // Mark original giveback as resubbed (prevents double-resubbing)
-    await this.subscriptionsService.markGivebackResubbed(
-      data.originalGivebackId,
-    );
+    await this.markGivebackResubbed(data.originalGivebackId);
 
     await this.loggerService.log({
       userId: sponsorUserId,
@@ -1134,5 +1130,66 @@ export class SponsorsService {
     return this.subscriptionsService.getExpiringSoonGivebacks(
       sponsorProfile.id,
     );
+  }
+
+  // ─── Giveback queries (own givebackRepo — no cross-module entity access) ────
+
+  /** Get total giveback count for a sponsor. */
+  async getSponsoredGivebackCount(sponsorId: string): Promise<number> {
+    return this.givebackRepo.count({ where: { sponsorId } });
+  }
+
+  /** Returns % change in givebacks: this calendar month vs last calendar month. */
+  async getGivebacksMonthlyChange(sponsorId: string): Promise<number> {
+    const now = new Date();
+    const thisStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const [thisMonth, lastMonth] = await Promise.all([
+      this.givebackRepo.count({
+        where: { sponsorId, createdAt: Between(thisStart, now) as any },
+      }),
+      this.givebackRepo.count({
+        where: { sponsorId, createdAt: Between(lastStart, lastEnd) as any },
+      }),
+    ]);
+
+    if (lastMonth === 0) return thisMonth > 0 ? 100 : 0;
+    return Math.round(((thisMonth - lastMonth) / lastMonth) * 100);
+  }
+
+  /** Get recent givebacks for sponsor dashboard. */
+  async getRecentSponsoredGivebacks(
+    sponsorId: string,
+    limit = 4,
+  ): Promise<Giveback[]> {
+    return this.givebackRepo.find({
+      where: { sponsorId },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  /** Count active sponsored giveback batches expiring within the next N days. */
+  async countExpiringSponsoredSubscriptions(
+    sponsorId: string,
+    days = 10,
+  ): Promise<number> {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + days * DAY_MS);
+    return this.givebackRepo.count({
+      where: {
+        sponsorId,
+        status: GivebackStatus.ACTIVE,
+        hasResubbed: false,
+        endDate: Between(now, cutoff),
+      },
+    });
+  }
+
+  /** Mark a giveback as having been resubbed. */
+  async markGivebackResubbed(givebackId: string): Promise<void> {
+    await this.givebackRepo.update({ id: givebackId }, { hasResubbed: true });
   }
 }

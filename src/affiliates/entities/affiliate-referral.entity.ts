@@ -1,21 +1,11 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
-  CreateDateColumn,
-  OneToOne,
-} from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
 import { AffiliateProfile } from './affiliate-profile.entity';
 import { User } from '../../users/entities/user.entity';
 import { ReferredUserType } from '../../../types';
+import { BaseEntity } from '../../common/entities';
 
 @Entity('affiliate_referrals')
-export class AffiliateReferral {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class AffiliateReferral extends BaseEntity {
   @Column()
   affiliateId: string; // Who referred this user
 
@@ -39,9 +29,6 @@ export class AffiliateReferral {
 
   @Column({ type: 'float', default: 0 })
   totalRevenueGenerated: number;
-
-  @CreateDateColumn()
-  createdAt: Date;
 
   // Relations
   @ManyToOne(() => AffiliateProfile, (affiliate) => affiliate.referrals, {

@@ -1,12 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
   forwardRef,
   Inject,
 } from '@nestjs/common';
@@ -29,10 +26,7 @@ import { GradingService } from './services/grading.service';
 import { StudentsService } from '../students/students.service';
 import { StartExamDto } from './dto/start-exam.dto';
 import { SubmitExamDto } from './dto/submit-exam.dto';
-import { examTypesData } from './data/exam-types.data';
-import { subjectsData } from './data/subjects.data';
 import { questionsSeedData } from './data/questions.seed';
-import { topicsSeedData } from './data/topics.seed';
 import { examConfigsSeedData } from './data/exam-configs.data';
 import {
   ExamAttemptStatus,
@@ -46,7 +40,7 @@ import {
 } from '../../types';
 
 @Injectable()
-export class ExamsService implements OnModuleInit {
+export class ExamsService {
   constructor(
     @InjectRepository(ExamType)
     private examTypeRepo: Repository<ExamType>,
@@ -70,157 +64,6 @@ export class ExamsService implements OnModuleInit {
   ) {}
 
   // ─── Seeding ─────────────────────────────────────────────────────────────
-
-  async onModuleInit() {
-    const examTypeCount = await this.examTypeRepo.count();
-    if (examTypeCount === 0) {
-      await this.seedExamTypes();
-      await this.seedSubjects();
-    } else {
-      // Keep exam type metadata in sync with seed data on every startup
-      // (covers freeTierQuestionLimit, supportedCategories, etc. without re-seeding)
-      await this.syncExamTypeMetadata();
-    }
-    // Seed topics after subjects exist — idempotent.
-    await this.seedTopics();
-    // Always ensure ExamConfigs exist — needed for mock mode question count & time limit.
-    // Safe to run every startup; skips rows that already exist.
-    await this.syncExamConfigs();
-  }
-
-  private async syncExamConfigs(): Promise<void> {
-    const examTypes = await this.examTypeRepo.find();
-    const examTypeMap = new Map(examTypes.map((et) => [et.name, et]));
-
-    for (const seed of examConfigsSeedData) {
-      const examType = examTypeMap.get(seed.examTypeName);
-      if (!examType) continue;
-
-      const existing = await this.examConfigRepo.findOne({
-        where: { examTypeId: examType.id, mode: seed.mode },
-      });
-
-      if (existing) {
-        // Keep config values in sync with seed data
-        await this.examConfigRepo.update(existing.id, {
-          standardDurationMinutes: seed.standardDurationMinutes ?? undefined,
-          standardQuestionCount: seed.standardQuestionCount ?? undefined,
-          rules: seed.rules ?? undefined,
-        });
-      } else {
-        const config = this.examConfigRepo.create({
-          examTypeId: examType.id,
-          mode: seed.mode,
-          standardDurationMinutes: seed.standardDurationMinutes ?? undefined,
-          standardQuestionCount: seed.standardQuestionCount ?? undefined,
-          rules: seed.rules ?? undefined,
-        });
-        await this.examConfigRepo.save(config);
-      }
-    }
-  }
-
-  private async syncExamTypeMetadata(): Promise<void> {
-    for (const data of examTypesData) {
-      await this.examTypeRepo.update(
-        { name: data.name },
-        {
-          freeTierQuestionLimit: data.freeTierQuestionLimit,
-          supportedCategories: data.supportedCategories,
-          minSubjectsSelectable: data.minSubjectsSelectable,
-          maxSubjectsSelectable: data.maxSubjectsSelectable,
-        },
-      );
-    }
-  }
-
-  async seedExamTypes() {
-    const examTypes = examTypesData.map((examType) =>
-      this.examTypeRepo.create(examType),
-    );
-    await this.examTypeRepo.save(examTypes);
-  }
-
-  /**
-   * Seeds subjects and creates the explicit ExamTypeSubject join records.
-   * Each subject in subjectsData belongs to one exam type — we create
-   * the Subject row then immediately link it via ExamTypeSubject.
-   */
-  async seedSubjects() {
-    const examTypes = await this.examTypeRepo.find();
-    const examTypeMap = new Map(examTypes.map((et) => [et.name, et]));
-
-    const subjectsByExamType = new Map<string, typeof subjectsData>();
-    subjectsData.forEach((subject) => {
-      const existing = subjectsByExamType.get(subject.examTypeName) || [];
-      subjectsByExamType.set(subject.examTypeName, [...existing, subject]);
-    });
-
-    for (const [examTypeName, subjects] of subjectsByExamType) {
-      const examType = examTypeMap.get(examTypeName);
-      if (!examType) continue;
-
-      for (const subjectData of subjects) {
-        const subjectEntity = this.subjectRepo.create({
-          name: subjectData.name,
-          description: subjectData.description,
-        });
-        const savedSubject = await this.subjectRepo.save(subjectEntity);
-
-        const ets = this.examTypeSubjectRepo.create({
-          examTypeId: examType.id,
-          subjectId: savedSubject.id,
-        });
-        await this.examTypeSubjectRepo.save(ets);
-      }
-    }
-  }
-
-  /**
-   * Seeds topics from topicsSeedData.
-   * Looks up each Subject by name + exam type, then upserts the Topic row.
-   * Idempotent — skips topics that already exist.
-   */
-  async seedTopics(): Promise<void> {
-    const allETS = await this.examTypeSubjectRepo.find({
-      relations: ['examType', 'subject'],
-    });
-
-    // "JAMB::Mathematics" → subjectId
-    const subjectIdMap = new Map<string, string>(
-      allETS.map((ets) => [
-        `${ets.examType.name}::${ets.subject.name}`,
-        ets.subjectId,
-      ]),
-    );
-
-    for (const seed of topicsSeedData) {
-      const subjectId = subjectIdMap.get(
-        `${seed.examTypeName}::${seed.subjectName}`,
-      );
-      if (!subjectId) continue;
-
-      const existing = await this.topicRepo.findOne({
-        where: { subjectId, name: seed.name },
-      });
-      if (existing) {
-        // Keep content in sync with seed data
-        if (existing.content !== seed.content) {
-          existing.content = seed.content;
-          await this.topicRepo.save(existing);
-        }
-        continue;
-      }
-
-      await this.topicRepo.save(
-        this.topicRepo.create({
-          subjectId,
-          name: seed.name,
-          content: seed.content,
-        }),
-      );
-    }
-  }
 
   // ─── Public Exam Type / Subject Queries ──────────────────────────────────
 

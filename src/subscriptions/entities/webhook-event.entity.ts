@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Entity, Column, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities';
 import { PaymentProvider, WebhookEventType } from '../../../types';

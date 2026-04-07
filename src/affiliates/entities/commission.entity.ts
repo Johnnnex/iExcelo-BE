@@ -1,21 +1,12 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { AffiliateProfile } from './affiliate-profile.entity';
 import { AffiliateReferral } from './affiliate-referral.entity';
 import { Subscription } from '../../subscriptions/entities/subscription.entity';
 import { CommissionStatus, Currency } from '../../../types';
+import { BaseEntity } from '../../common/entities';
 
 @Entity('commissions')
-export class Commission {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class Commission extends BaseEntity {
   @Column()
   affiliateId: string;
 
@@ -31,9 +22,6 @@ export class Commission {
     default: CommissionStatus.PENDING,
   })
   status: CommissionStatus;
-
-  @CreateDateColumn()
-  createdAt: Date;
 
   @Column({ type: 'timestamp', nullable: true })
   paidAt: Date;

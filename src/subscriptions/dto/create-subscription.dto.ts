@@ -1,4 +1,4 @@
-import { IsUUID, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsUUID, IsOptional, IsString } from 'class-validator';
 import { PaymentProvider } from '../../../types';
 
 export class InitiateSubscriptionDto {

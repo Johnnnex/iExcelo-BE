@@ -27,7 +27,7 @@ import { StudentsService } from '../students/students.service';
 import { SponsorsService } from '../sponsors/sponsors.service';
 import { AffiliatesService } from '../affiliates/affiliates.service';
 import { LoggerService } from '../logger/logger.service';
-import { SponsorType, LogActionTypes } from '../../types';
+import { SponsorType, LogActionTypes, SponsorInviteStatus } from '../../types';
 
 @Injectable()
 export class AuthService {
@@ -233,7 +233,7 @@ export class AuthService {
           }
         }
 
-        const studentProfile = await this.studentsService.createStudentProfile({
+        await this.studentsService.createStudentProfile({
           userId: user.id,
           examTypeId: signUpDto.examTypeId,
           phoneNumber: signUpDto.phoneNumber,
@@ -700,6 +700,27 @@ export class AuthService {
             }
           }
 
+          // Resolve sponsor display name if this is a sponsor URL signup
+          let sponsorDisplayName: string | undefined;
+          if (sponsorUrlData) {
+            try {
+              const sponsorProfile = await this.sponsorsService.findByProfileId(
+                sponsorUrlData.sponsorId,
+              );
+              if (sponsorProfile) {
+                const sponsorUser = await this.usersService.findById(
+                  sponsorProfile.userId,
+                );
+                sponsorDisplayName =
+                  sponsorProfile.companyName ||
+                  `${sponsorUser?.firstName ?? ''} ${sponsorUser?.lastName ?? ''}`.trim() ||
+                  undefined;
+              }
+            } catch {
+              // Don't fail signup if name lookup fails
+            }
+          }
+
           // Use service method to create profile (also creates StudentExamType)
           profile = await this.studentsService.createStudentProfile({
             userId: user.id,
@@ -707,6 +728,7 @@ export class AuthService {
             isSponsored: !!sponsorUrlData,
             sponsorId: sponsorUrlData?.sponsorId ?? undefined,
             sponsorUrlId: sponsorUrlData?.urlId ?? undefined,
+            sponsorDisplayName,
           });
 
           // Track sponsor URL usage
@@ -1073,7 +1095,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired activation link.');
     }
 
-    if (invite.status !== 'pending') {
+    if (invite.status !== SponsorInviteStatus.PENDING) {
       throw new UnauthorizedException(
         'This activation link has already been used.',
       );

@@ -198,6 +198,16 @@ export enum SponsorInviteStatus {
   EXPIRED = 'expired',    // 7-day window passed without activation
 }
 
+export enum ChatroomType {
+  SPONSOR_STUDENT = 'sponsor_student',
+  STUDENT_STUDENT = 'student_student', // reserved for future use
+}
+
+export enum ChatDeliveryStatus {
+  SENT = 'sent', // saved to DB, not yet read
+  READ = 'read', // recipient opened the chatroom (lastReadAt updated)
+}
+
 export enum WebhookEventType {
   PAYMENT_SUCCEEDED = 'payment.succeeded',
   PAYMENT_FAILED = 'payment.failed',

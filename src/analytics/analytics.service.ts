@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
+import { DAY_MS } from '../common/constants';
 import { StudentSubjectAnalytics } from './entities/student-subject-analytics.entity';
 import { StudentDailyAnalytics } from './entities/student-daily-analytics.entity';
 import { StudentStreak } from './entities/student-streak.entity';
@@ -96,7 +97,6 @@ export class AnalyticsService {
     //   day   = Sunday of current week → today (max 7 points)
     //   week  = first Sunday on/before 1st of current month → today (≤5 points)
     //   month = Jan 1 of current year → today (≤12 points)
-    const DAY_MS = 24 * 60 * 60 * 1000;
     const today = new Date(Date.UTC(localYear, localMonth, localDay));
     let localWindowStart: Date;
     if (granularity === 'day') {
@@ -331,7 +331,7 @@ export class AnalyticsService {
         .addSelect('SUM(sda."questionsAttempted")', 'attempted')
         .where('sda."studentId" = :studentId', { studentId })
         .andWhere('sda."examTypeId" = :examTypeId', { examTypeId })
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         .andWhere('sda.date BETWEEN :start AND :end', {
           start: thisMonthStart,
           end: now,
@@ -343,7 +343,7 @@ export class AnalyticsService {
         .addSelect('SUM(sda."questionsAttempted")', 'attempted')
         .where('sda."studentId" = :studentId', { studentId })
         .andWhere('sda."examTypeId" = :examTypeId', { examTypeId })
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         .andWhere('sda.date BETWEEN :start AND :end', {
           start: lastMonthStart,
           end: lastMonthEnd,
@@ -389,7 +389,6 @@ export class AnalyticsService {
     localDay: number;
     localDow: number;
   } {
-    const DAY_MS = 24 * 60 * 60 * 1000;
     const refDate = period ? new Date(period + 'T12:00:00Z') : new Date();
     const { year, month, day, dow } = getLocalDateParts(refDate, timezone);
 
@@ -430,7 +429,6 @@ export class AnalyticsService {
     subjects: { id: string; name: string }[];
     granularity: string;
   }> {
-    const DAY_MS = 24 * 60 * 60 * 1000;
     const now = new Date();
     const {
       year: localYear,
@@ -462,7 +460,7 @@ export class AnalyticsService {
       .leftJoinAndSelect('ssa.subject', 'subject')
       .where('ssa."studentId" = :studentId', { studentId })
       .andWhere('ssa."examTypeId" = :examTypeId', { examTypeId })
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       .andWhere('ssa.date BETWEEN :start AND :end', {
         start: queryStart,
         end: queryEnd,
@@ -626,8 +624,6 @@ export class AnalyticsService {
     data: { period: string; accuracy: number }[];
     granularity: string;
   }> {
-    const DAY_MS = 24 * 60 * 60 * 1000;
-
     const {
       year: localYear,
       month: localMonth,
@@ -777,7 +773,6 @@ export class AnalyticsService {
     startDate: string | undefined,
     endDate: string | undefined,
   ): Promise<{ name: string; Score: number }[]> {
-    const DAY_MS = 24 * 60 * 60 * 1000;
     const now = new Date();
     const rangeStart = startDate
       ? new Date(startDate + 'T00:00:00Z')
@@ -795,7 +790,7 @@ export class AnalyticsService {
       .innerJoin('subjects', 'sub', 'sub.id = ssa."subjectId"')
       .where('ssa."studentId" = :studentId', { studentId })
       .andWhere('ssa."examTypeId" = :examTypeId', { examTypeId })
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       .andWhere('ssa.date BETWEEN :start AND :end', {
         start: queryStart,
         end: queryEnd,
@@ -845,7 +840,6 @@ export class AnalyticsService {
   ): Promise<
     { subjectId: string; subjectName: string; questionsAttempted: number }[]
   > {
-    const DAY_MS = 24 * 60 * 60 * 1000;
     let queryStart: Date;
     let queryEnd: Date;
 
@@ -868,7 +862,7 @@ export class AnalyticsService {
       .innerJoin('subjects', 'sub', 'sub.id = ssa."subjectId"')
       .where('ssa."studentId" = :studentId', { studentId })
       .andWhere('ssa."examTypeId" = :examTypeId', { examTypeId })
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       .andWhere('ssa.date BETWEEN :start AND :end', {
         start: queryStart,
         end: queryEnd,
@@ -884,8 +878,11 @@ export class AnalyticsService {
       .catch(() => []);
 
     return rows.map((r) => ({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       subjectId: r.subjectId,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       subjectName: r.subjectName,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
       questionsAttempted: parseInt(r.questionsAttempted, 10),
     }));
   }

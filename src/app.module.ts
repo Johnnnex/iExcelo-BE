@@ -10,12 +10,15 @@ import { AuthModule } from './auth/auth.module';
 import { SponsorsModule } from './sponsors/sponsors.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bullmq';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggingInterceptor } from './common/interceptors';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UtilsModule } from './utils/utils.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { UploadModule } from './upload/upload.module';
+import { ChatsModule } from './chats/chats.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +33,19 @@ import { UploadModule } from './upload/upload.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+
+    // BullMQ global connection — all queue modules share this Redis config
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST', 'localhost'),
+          port: configService.get<number>('REDIS_PORT', 6379),
+          password: configService.get<string>('REDIS_PASSWORD') || undefined,
+        },
+      }),
+      inject: [ConfigService],
     }),
 
     TypeOrmModule.forRootAsync({
@@ -57,6 +73,8 @@ import { UploadModule } from './upload/upload.module';
 
     UtilsModule,
     UploadModule,
+    ChatsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

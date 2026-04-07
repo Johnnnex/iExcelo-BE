@@ -1,19 +1,9 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { BaseEntity } from '../../common/entities';
 
 @Entity('onboarding_tokens')
-export class OnboardingToken {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class OnboardingToken extends BaseEntity {
   @Column()
   userId: string;
 
@@ -25,12 +15,6 @@ export class OnboardingToken {
 
   @Column({ type: 'timestamp', nullable: true })
   usedAt: Date | null;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 
   // Relations
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

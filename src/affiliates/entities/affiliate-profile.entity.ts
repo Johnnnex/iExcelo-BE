@@ -1,22 +1,11 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  OneToOne,
-  JoinColumn,
-  OneToMany,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, Column, OneToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { AffiliateReferral } from './affiliate-referral.entity';
 import { Commission } from './commission.entity';
+import { BaseEntity } from '../../common/entities';
 
 @Entity('affiliate_profiles')
-export class AffiliateProfile {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class AffiliateProfile extends BaseEntity {
   @Column()
   userId: string;
 
@@ -37,12 +26,6 @@ export class AffiliateProfile {
 
   @Column({ type: 'float', default: 0 })
   totalPaidOut: number;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 
   // Relations
   @OneToOne(() => User, (user) => user.affiliateProfile, {

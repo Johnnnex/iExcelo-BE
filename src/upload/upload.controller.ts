@@ -12,14 +12,10 @@ import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators';
 import { UserType } from '../../types';
-
-const ALLOWED_MIMETYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'image/svg+xml',
-];
+import {
+  ALLOWED_IMAGE_MIMETYPES,
+  MAX_IMAGE_UPLOAD_SIZE,
+} from '../common/constants';
 
 @Controller('upload')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,12 +33,12 @@ export class UploadController {
   @Post('image')
   @UseInterceptors(
     FileInterceptor('image', {
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max
+      limits: { fileSize: MAX_IMAGE_UPLOAD_SIZE },
       fileFilter: (_req, file, cb) => {
-        if (!ALLOWED_MIMETYPES.includes(file.mimetype)) {
+        if (!ALLOWED_IMAGE_MIMETYPES.includes(file.mimetype)) {
           cb(
             new Error(
-              `Unsupported file type. Allowed: ${ALLOWED_MIMETYPES.join(', ')}`,
+              `Unsupported file type. Allowed: ${ALLOWED_IMAGE_MIMETYPES.join(', ')}`,
             ),
             false,
           );

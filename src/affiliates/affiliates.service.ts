@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
+import { DAY_MS } from '../common/constants';
 import { AffiliateProfile } from './entities/affiliate-profile.entity';
 import { AffiliateReferral } from './entities/affiliate-referral.entity';
 import { Commission } from './entities/commission.entity';
@@ -556,7 +557,6 @@ export class AffiliatesService {
       : `TO_CHAR(${tzExpr}, 'YYYY-MM-DD')`;
 
     // ── 2. Query window (UTC, +2-day buffer to capture any TZ edge case) ─────
-    const DAY_MS = 24 * 60 * 60 * 1000;
     // Local period start as a "fake UTC" date
     let localWindowStart: Date;
     if (granularity === 'day') {

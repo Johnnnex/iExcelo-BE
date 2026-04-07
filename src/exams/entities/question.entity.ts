@@ -101,6 +101,11 @@ export class Question extends BaseEntity {
   @Column({ default: 0 })
   timesCorrect: number;
 
+  // Legacy question ID from the original iExcelo site — used for idempotent import.
+  // Can be dropped (set to null or removed) once migration is verified complete.
+  @Column({ nullable: true, unique: true })
+  legacyId: string;
+
   // ─── Relations ────────────────────────────────────────────────────────────
 
   @ManyToOne(() => ExamTypeSubject, (ets) => ets.questions, {

@@ -77,7 +77,7 @@ export class SubscriptionPlansService {
     examTypeId?: string;
     isActive?: boolean;
   }): Promise<SubscriptionPlan[]> {
-    const where: any = {};
+    const where: { examTypeId?: string; isActive?: boolean } = {};
 
     if (filters?.examTypeId) {
       where.examTypeId = filters.examTypeId;

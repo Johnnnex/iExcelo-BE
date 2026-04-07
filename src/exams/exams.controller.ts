@@ -14,10 +14,8 @@ import {
 import { ExamsService } from './exams.service';
 import { StartExamDto } from './dto/start-exam.dto';
 import { SubmitExamDto } from './dto/submit-exam.dto';
-import { Public, Roles } from '../common/decorators';
+import { Public } from '../common/decorators';
 import { JwtAuthGuard } from '../common/guards/jwt.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { UserType } from '../../types';
 
 @Controller('exams')
 export class ExamsController {
@@ -57,7 +55,10 @@ export class ExamsController {
    */
   @Post('start')
   @UseGuards(JwtAuthGuard)
-  async startExam(@Req() req: any, @Body() dto: StartExamDto) {
+  async startExam(
+    @Req() req: { user: { id: string } },
+    @Body() dto: StartExamDto,
+  ) {
     const result = await this.examsService.startExam(req.user.id, dto);
     return { message: 'Exam started successfully', data: result };
   }
@@ -70,7 +71,10 @@ export class ExamsController {
    */
   @Post('submit')
   @UseGuards(JwtAuthGuard)
-  async submitExam(@Req() req: any, @Body() dto: SubmitExamDto) {
+  async submitExam(
+    @Req() req: { user: { id: string } },
+    @Body() dto: SubmitExamDto,
+  ) {
     const result = await this.examsService.submitExam(req.user.id, dto);
     return { message: 'Exam submitted successfully', data: result };
   }
@@ -80,13 +84,12 @@ export class ExamsController {
   @Get('attempts/:attemptId/questions')
   @UseGuards(JwtAuthGuard)
   async getAttemptQuestions(
-    @Req() req: any,
+    @Req() req: { user: { id: string } },
     @Param('attemptId') attemptId: string,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const userId = req.user.id as string;
+    const userId = req.user.id;
     const result = await this.examsService.getAttemptQuestions(
       userId,
       attemptId,
@@ -101,12 +104,12 @@ export class ExamsController {
   @Put('attempts/:attemptId/draft')
   @UseGuards(JwtAuthGuard)
   async saveDraft(
-    @Req() req: any,
+    @Req() req: { user: { id: string } },
     @Param('attemptId') attemptId: string,
     @Body() body: { draftResponses: Record<string, unknown> },
   ) {
     const result = await this.examsService.saveDraft(
-      req.user.id as string,
+      req.user.id,
       attemptId,
       body.draftResponses,
     );
@@ -115,9 +118,11 @@ export class ExamsController {
 
   @Get('attempts/:attemptId/draft')
   @UseGuards(JwtAuthGuard)
-  async getDraft(@Req() req: any, @Param('attemptId') attemptId: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const userId = req.user.id as string;
+  async getDraft(
+    @Req() req: { user: { id: string } },
+    @Param('attemptId') attemptId: string,
+  ) {
+    const userId = req.user.id;
     const result = await this.examsService.getDraft(userId, attemptId);
     return { message: 'Draft retrieved', data: result };
   }

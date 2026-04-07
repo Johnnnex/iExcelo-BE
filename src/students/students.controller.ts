@@ -98,6 +98,7 @@ export class StudentsController {
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result = await this.studentsService.getExamAttemptDetail(
       req.user.id,
       id,
@@ -107,6 +108,7 @@ export class StudentsController {
     return {
       success: true,
       message: 'Exam attempt detail retrieved successfully',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data: result,
     };
   }
@@ -123,6 +125,7 @@ export class StudentsController {
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result = await this.studentsService.getExamAttemptQuestions(
       req.user.id,
       id,
@@ -132,6 +135,7 @@ export class StudentsController {
     return {
       success: true,
       message: 'Questions retrieved',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data: result,
     };
   }
@@ -181,7 +185,7 @@ export class StudentsController {
     @Query('examTypeId') examTypeId: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @Query('timezone') timezone?: string,
+    @Query('timezone') _timezone?: string,
   ) {
     const student = await this.studentsService.findStudentByUserId(req.user.id);
     const data = await this.studentsService.getAnalyticsSubjectScores(
@@ -290,8 +294,8 @@ export class StudentsController {
   }
 
   @Post()
-  async create(@Body() createStudentDto: CreateStudentDto) {
-    const student = await this.studentsService.create(createStudentDto);
+  create(@Body() createStudentDto: CreateStudentDto) {
+    const student = this.studentsService.create(createStudentDto);
     return {
       message: 'Student created successfully',
       data: student,
@@ -299,8 +303,8 @@ export class StudentsController {
   }
 
   @Get()
-  async findAll() {
-    const students = await this.studentsService.findAll();
+  findAll() {
+    const students = this.studentsService.findAll();
     return {
       message: 'Students retrieved successfully',
       data: students,
@@ -308,8 +312,8 @@ export class StudentsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const student = await this.studentsService.findOne(+id);
+  findOne(@Param('id') id: string) {
+    const student = this.studentsService.findOne(+id);
     return {
       message: 'Student retrieved successfully',
       data: student,
@@ -355,11 +359,8 @@ export class StudentsController {
   }
 
   @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() updateStudentDto: UpdateStudentDto,
-  ) {
-    const student = await this.studentsService.update(+id, updateStudentDto);
+  update(@Param('id') id: string, @Body() updateStudentDto: UpdateStudentDto) {
+    const student = this.studentsService.update(+id, updateStudentDto);
     return {
       message: 'Student updated successfully',
       data: student,
@@ -367,8 +368,8 @@ export class StudentsController {
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    await this.studentsService.remove(+id);
+  remove(@Param('id') id: string) {
+    this.studentsService.remove(+id);
     return {
       message: 'Student deleted successfully',
       data: null,

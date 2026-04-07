@@ -209,6 +209,81 @@ export class EmailService {
     });
   }
 
+  async sendNewMessagesBatchEmail(
+    email: string,
+    firstName: string,
+    messages: Array<{
+      senderName: string;
+      preview: string;
+      chatroomId: string;
+    }>,
+  ) {
+    const frontendUrl = this.configService.get(
+      'FRONTEND_URL',
+      'https://iexcelo.com',
+    );
+
+    const messageRows = messages
+      .map(
+        (m) => `
+        <tr>
+          <td style="padding: 12px 0; border-bottom: 1px solid #F3F4F6;">
+            <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">${m.senderName}</p>
+            <p style="margin: 0 0 8px 0; color: #374151; font-size: 14px;">"${m.preview}"</p>
+            <a href="${frontendUrl}/messages/${m.chatroomId}"
+               style="color: #007FFF; font-size: 13px; text-decoration: none;">
+              Reply →
+            </a>
+          </td>
+        </tr>`,
+      )
+      .join('');
+
+    const subject =
+      messages.length === 1
+        ? `New message from ${messages[0].senderName} — iExcelo`
+        : `${messages.length} new messages waiting for you — iExcelo`;
+
+    await this.transporter.sendMail({
+      from: this.configService.get('SMTP_FROM', 'noreply@iexcelo.com'),
+      to: email,
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #007FFF;">
+            ${messages.length === 1 ? 'You have a new message' : `You have ${messages.length} new messages`}
+          </h2>
+          <p>Hi ${firstName},</p>
+          <p>
+            ${
+              messages.length === 1
+                ? `${messages[0].senderName} sent you a message on iExcelo.`
+                : `You received ${messages.length} messages while you were away.`
+            }
+          </p>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+            ${messageRows}
+          </table>
+
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${frontendUrl}/messages"
+               style="background-color: #007FFF; color: white; padding: 14px 28px;
+                      text-decoration: none; border-radius: 24px; display: inline-block; font-weight: 600;">
+              Open Messages
+            </a>
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB;
+                      text-align: center; color: #667085; font-size: 12px;">
+            <p>You're receiving this because you have messages waiting on iExcelo.</p>
+            <p>© ${new Date().getFullYear()} iExcelo. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+  }
+
   async sendWelcomeEmail(
     email: string,
     firstName: string,

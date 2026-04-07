@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -17,6 +14,7 @@ import {
   LogActionTypes,
   TransactionType,
   Currency,
+  SubscriptionStatus,
 } from '../../../types';
 
 @Injectable()
@@ -223,7 +221,10 @@ export class WebhookService {
       // Otherwise it's initial activation.
       const existingSub =
         await this.subscriptionsService.findSubscriptionById(subscriptionId);
-      if (existingSub?.status === 'active' && existingSub.startDate) {
+      if (
+        existingSub?.status === SubscriptionStatus.ACTIVE &&
+        existingSub.startDate
+      ) {
         await this.subscriptionsService.renewSubscription(
           subscriptionId,
           paymentData?.amount
@@ -457,8 +458,8 @@ export class WebhookService {
 
     if (
       subscription &&
-      subscription.status !== 'cancelled' &&
-      subscription.status !== 'expired'
+      subscription.status !== SubscriptionStatus.CANCELLED &&
+      subscription.status !== SubscriptionStatus.EXPIRED
     ) {
       await this.subscriptionsService.deactivateSubscription(
         subscription.id,

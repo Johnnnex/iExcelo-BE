@@ -5,6 +5,7 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { ApiKeyGuard } from './common/guards';
 import { ConfigService } from '@nestjs/config';
 
@@ -37,6 +38,9 @@ async function bootstrap() {
 
   // ========== Global Exception Filter ==========
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // ========== Global Response Transform ==========
+  app.useGlobalInterceptors(new TransformInterceptor());
 
   // ========== Global Guards ==========
   // Apply API Key guard globally

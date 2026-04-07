@@ -203,9 +203,11 @@ export class StudentsService {
     }
 
     // Re-fetch currentStudentExamType after reconcile (isPaid may have changed)
+    // Must include examType relation — used for name, minSubjectsSelectable, maxSubjectsSelectable etc.
     const currentStudentExamType = resolvedExamTypeId
       ? await this.studentExamTypeRepo.findOne({
           where: { studentId: student.id, examTypeId: resolvedExamTypeId },
+          relations: ['examType'],
         })
       : null;
 
@@ -602,7 +604,7 @@ export class StudentsService {
     };
   }
 
-  create(createStudentDto: CreateStudentDto) {
+  create(_createStudentDto: CreateStudentDto) {
     return 'This action adds a new student';
   }
 
@@ -614,7 +616,7 @@ export class StudentsService {
     return `This action returns a #${id} student`;
   }
 
-  update(id: number, updateStudentDto: UpdateStudentDto) {
+  update(id: number, _updateStudentDto: UpdateStudentDto) {
     return `This action updates a #${id} student`;
   }
 
@@ -812,7 +814,9 @@ export class StudentsService {
             text: opt.text,
           })),
           correctAnswer: q.correctAnswer ?? null,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           studentAnswer: r?.answer ?? null,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           isCorrect: r?.isCorrect ?? null,
         };
       })
@@ -1083,6 +1087,7 @@ export class StudentsService {
 
     // Avg score rank (highest avg score = rank #1)
     // Students who haven't written exams sit below all exam writers, so rank = denominator
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const myIndex = rows.findIndex((r: any) => r.studentId === studentId);
     const rank = myIndex === -1 ? denominator : myIndex + 1;
     const percentile = Math.round(
@@ -1094,6 +1099,7 @@ export class StudentsService {
       (a, b) => parseInt(b.examCount, 10) - parseInt(a.examCount, 10),
     );
     const myExamCountIndex = rowsByExamCount.findIndex(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       (r: any) => r.studentId === studentId,
     );
     const examCountRank =
