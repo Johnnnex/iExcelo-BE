@@ -8,6 +8,13 @@ import {
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import {
+  ANALYTICS_QUEUE,
+  AnalyticsJobs,
+} from '../analytics/queue/analytics.queue';
+import { EXAM_POST_QUEUE, ExamPostJobs } from './queue/exam-post.queue';
 import { In, Repository } from 'typeorm';
 import { ExamType } from './entities/exam-type.entity';
 import { Subject } from './entities/subject.entity';
@@ -26,8 +33,6 @@ import { GradingService } from './services/grading.service';
 import { StudentsService } from '../students/students.service';
 import { StartExamDto } from './dto/start-exam.dto';
 import { SubmitExamDto } from './dto/submit-exam.dto';
-import { questionsSeedData } from './data/questions.seed';
-import { examConfigsSeedData } from './data/exam-configs.data';
 import {
   ExamAttemptStatus,
   ExamConfigModes,
@@ -57,6 +62,8 @@ export class ExamsService {
     @InjectRepository(Topic)
     private topicRepo: Repository<Topic>,
     private readonly analyticsService: AnalyticsService,
+    @InjectQueue(ANALYTICS_QUEUE) private readonly analyticsQueue: Queue,
+    @InjectQueue(EXAM_POST_QUEUE) private readonly examPostQueue: Queue,
     private readonly loggerService: LoggerService,
     private readonly gradingService: GradingService,
     @Inject(forwardRef(() => StudentsService))
@@ -232,8 +239,8 @@ export class ExamsService {
       allQuestionIds,
     );
 
-    // TODO: Move to message queue (RabbitMQ/Kafka) for non-blocking async processing
-    await this.loggerService.log({
+    // Log exam start (queued — side effect, does not block response)
+    await this.examPostQueue.add(ExamPostJobs.LOG_EVENT, {
       userId,
       action: LogActionTypes.EXAM_START,
       description: `Exam started: ${dto.mode}`,
@@ -313,6 +320,15 @@ export class ExamsService {
     let essayCount = 0;
     const gradedResponses: ExamAttempt['questionResponses'] = [];
     const subjectStats = new Map<string, SubjectGradeStats>();
+    // Accumulate per-question data for the background batch job (no async calls in this loop)
+    const questionBatchResults: Array<{
+      questionId: string;
+      isCorrect: boolean | null;
+      exemptFromMetrics: boolean;
+      isFlagged: boolean;
+      flagType?: string;
+      flagReason?: string;
+    }> = [];
 
     for (const response of dto.questionResponses) {
       const question = questionMap.get(response.questionId);
@@ -368,41 +384,15 @@ export class ExamsService {
         flagType: response.flagType ?? undefined,
       });
 
-      if (response.isFlagged) {
-        // TODO: Move to message queue
-        await this.studentsService.upsertFlaggedQuestion(
-          student.id,
-          response.questionId,
-          { flagType: response.flagType, reason: response.flagReason },
-        );
-      }
-
-      // TODO: Move to message queue
-      await this.studentsService.updateQuestionProgress(
-        student.id,
-        question.id,
-        result.isCorrect,
-        result.exemptFromMetrics,
-      );
-    }
-
-    // 5b. Process explicit flag updates (new flags on unanswered questions + removals)
-    // TODO: Move to message queue
-    if (dto.flagUpdates?.length) {
-      for (const update of dto.flagUpdates) {
-        if (update.isFlagged) {
-          await this.studentsService.upsertFlaggedQuestion(
-            student.id,
-            update.questionId,
-            { flagType: update.flagType, reason: update.flagReason },
-          );
-        } else {
-          await this.studentsService.removeFlaggedQuestion(
-            student.id,
-            update.questionId,
-          );
-        }
-      }
+      // Accumulate for background job (no blocking I/O inside this loop)
+      questionBatchResults.push({
+        questionId: question.id,
+        isCorrect: result.isCorrect,
+        exemptFromMetrics: result.exemptFromMetrics ?? false,
+        isFlagged: response.isFlagged ?? false,
+        flagType: response.flagType,
+        flagReason: response.flagReason,
+      });
     }
 
     const totalAttempted = correctAnswers + wrongAnswers;
@@ -415,7 +405,7 @@ export class ExamsService {
         ? (totalMarksObtained / examAttempt.totalMarksPossible) * 100
         : 0;
 
-    // 6. Persist exam attempt result
+    // 6. Persist exam attempt result (synchronous — student needs this immediately)
     examAttempt.correctAnswers = correctAnswers;
     examAttempt.wrongAnswers = wrongAnswers;
     examAttempt.unanswered = unanswered;
@@ -428,20 +418,26 @@ export class ExamsService {
     examAttempt.completedAt = new Date();
     await this.studentsService.saveExamAttempt(examAttempt);
 
-    // 7. Update student profile lifetime metrics
-    await this.studentsService.incrementLifetimeMetrics(
-      student.id,
+    // 7–8. Dispatch all post-submission side effects to background queues
+    // Student gets their result immediately — these run asynchronously with retries
+
+    await this.examPostQueue.add(ExamPostJobs.QUESTION_BATCH, {
+      studentId: student.id,
+      questionResults: questionBatchResults,
+      flagUpdates: dto.flagUpdates,
+    });
+
+    await this.examPostQueue.add(ExamPostJobs.LIFETIME_METRICS, {
+      studentId: student.id,
       totalAttempted,
       correctAnswers,
       wrongAnswers,
-    );
+    });
 
-    // 8. Update analytics
-    // TODO: Move to message queue
-    await this.analyticsService.updateDailyAnalytics(
-      student.id,
-      examAttempt.examTypeId,
-      {
+    await this.analyticsQueue.add(AnalyticsJobs.UPDATE_DAILY, {
+      studentId: student.id,
+      examTypeId: examAttempt.examTypeId,
+      data: {
         questionsAttempted: totalAttempted,
         questionsCorrect: correctAnswers,
         questionsWrong: wrongAnswers,
@@ -449,20 +445,19 @@ export class ExamsService {
         timeSpentSeconds: elapsedSeconds,
         scorePercentage,
       },
-    );
+    });
 
-    for (const [subjectId, stats] of subjectStats) {
-      // TODO: Move to message queue
-      await this.analyticsService.updateSubjectAnalytics(
-        student.id,
-        examAttempt.examTypeId,
-        subjectId,
-        stats,
-      );
+    if (subjectStats.size > 0) {
+      await this.analyticsQueue.add(AnalyticsJobs.UPDATE_SUBJECT_BATCH, {
+        studentId: student.id,
+        examTypeId: examAttempt.examTypeId,
+        subjects: Array.from(subjectStats.entries()).map(
+          ([subjectId, stats]) => ({ subjectId, data: stats }),
+        ),
+      });
     }
 
-    // TODO: Move to message queue
-    await this.loggerService.log({
+    await this.examPostQueue.add(ExamPostJobs.LOG_EVENT, {
       userId,
       action: LogActionTypes.EXAM_SUBMIT,
       description: `Exam submitted: ${examAttempt.mode}`,
@@ -1169,230 +1164,6 @@ export class ExamsService {
     return {
       standardDurationMinutes: config?.standardDurationMinutes ?? 95,
       standardQuestionCount: config?.standardQuestionCount ?? 60,
-    };
-  }
-
-  // ─── Admin: Seed ──────────────────────────────────────────────────────────
-
-  /**
-   * Seeds ExamConfigs then Questions.
-   * Called from POST /exams/admin/reseed-questions.
-   * Idempotent — skips records that already exist.
-   */
-  async seedDummyQuestions(): Promise<{
-    questions: { created: number; skipped: number; amplified: number };
-    configs: { created: number; skipped: number };
-  }> {
-    // ── 1. Seed ExamConfigs ───────────────────────────────────────────────
-    const examTypes = await this.examTypeRepo.find();
-    const examTypeMap = new Map(examTypes.map((et) => [et.name, et]));
-
-    let configsCreated = 0;
-    let configsSkipped = 0;
-
-    for (const seed of examConfigsSeedData) {
-      const examType = examTypeMap.get(seed.examTypeName);
-      if (!examType) {
-        configsSkipped++;
-        continue;
-      }
-
-      const existing = await this.examConfigRepo.findOne({
-        where: { examTypeId: examType.id, mode: seed.mode },
-      });
-
-      if (existing) {
-        configsSkipped++;
-        continue;
-      }
-
-      const config = this.examConfigRepo.create({
-        examTypeId: examType.id,
-        mode: seed.mode,
-        standardDurationMinutes: seed.standardDurationMinutes ?? undefined,
-        standardQuestionCount: seed.standardQuestionCount ?? undefined,
-        rules: seed.rules ?? undefined,
-      });
-      await this.examConfigRepo.save(config);
-      configsCreated++;
-    }
-
-    // ── 2. Seed Questions ─────────────────────────────────────────────────
-    // Build lookup: "JAMB::Mathematics" → ExamTypeSubject record
-    const allETS = await this.examTypeSubjectRepo.find({
-      relations: ['examType', 'subject'],
-    });
-
-    const etsMap = new Map<string, ExamTypeSubject>(
-      allETS.map((ets) => [`${ets.examType.name}::${ets.subject.name}`, ets]),
-    );
-
-    // Build topic lookup: "subjectId::topicName" → topicId
-    const allTopics = await this.topicRepo.find();
-    const topicIdMap = new Map<string, string>(
-      allTopics.map((t) => [`${t.subjectId}::${t.name}`, t.id]),
-    );
-
-    let created = 0;
-    let skipped = 0;
-
-    for (const seed of questionsSeedData) {
-      const ets = etsMap.get(`${seed.examTypeName}::${seed.subjectName}`);
-
-      if (!ets) {
-        skipped++;
-        continue;
-      }
-
-      // Idempotency check
-      const existing = await this.questionRepo.findOne({
-        where: {
-          examTypeSubjectId: ets.id,
-          type: seed.type,
-          questionText: seed.questionText,
-        },
-      });
-
-      if (existing) {
-        let needsSave = false;
-
-        // Patch passageId if this question now has a passageSeed but was saved without one
-        if (seed.passageSeed && !existing.passageId) {
-          let patch = await this.passageRepo.findOne({
-            where: { examTypeSubjectId: ets.id, title: seed.passageSeed.title },
-          });
-          if (!patch) {
-            patch = this.passageRepo.create({
-              examTypeSubjectId: ets.id,
-              title: seed.passageSeed.title,
-              content: seed.passageSeed.content,
-            });
-            await this.passageRepo.save(patch);
-          }
-          existing.passageId = patch.id;
-          needsSave = true;
-        }
-
-        // Patch topicId if topicName provided and topicId changed
-        if (seed.topicName) {
-          const resolvedTopicId = topicIdMap.get(
-            `${ets.subjectId}::${seed.topicName}`,
-          );
-          if (resolvedTopicId && existing.topicId !== resolvedTopicId) {
-            existing.topicId = resolvedTopicId;
-            needsSave = true;
-          }
-        }
-
-        if (needsSave) {
-          await this.questionRepo.save(existing);
-        }
-        skipped++;
-        continue;
-      }
-
-      // Create/find passage first
-      let passageId: string | undefined;
-      if (seed.passageSeed) {
-        let passage = await this.passageRepo.findOne({
-          where: {
-            examTypeSubjectId: ets.id,
-            title: seed.passageSeed.title,
-          },
-        });
-
-        if (!passage) {
-          passage = this.passageRepo.create({
-            examTypeSubjectId: ets.id,
-            title: seed.passageSeed.title,
-            content: seed.passageSeed.content,
-          });
-          await this.passageRepo.save(passage);
-        }
-
-        passageId = passage.id;
-      }
-
-      const question = this.questionRepo.create({
-        examTypeSubjectId: ets.id,
-        passageId,
-        questionText: seed.questionText,
-        type: seed.type as string,
-        category: seed.category as string,
-        options: seed.options ?? undefined,
-        correctAnswer: seed.correctAnswer ?? undefined,
-        topicId: seed.topicName
-          ? (topicIdMap.get(`${ets.subjectId}::${seed.topicName}`) ?? undefined)
-          : undefined,
-        explanationShort: seed.explanationShort ?? undefined,
-        explanationLong: seed.explanationLong ?? undefined,
-        validationConfig: seed.validationConfig ?? undefined,
-        difficulty: seed.difficulty as string,
-        marks: seed.marks,
-      });
-
-      await this.questionRepo.save(question);
-      created++;
-    }
-
-    // ── 3. Amplify to 100 questions per ExamTypeSubject ──────────────────────
-    // Each unique base question is copied with a [vN] prefix so the rich-text
-    // formatter has a full bank to stress-test against, and the question
-    // fetching algorithm has enough data to work with.
-    const AMPLIFY_TARGET = 100;
-    let amplified = 0;
-
-    for (const [, ets] of etsMap) {
-      const currentCount = await this.questionRepo.count({
-        where: { examTypeSubjectId: ets.id },
-      });
-
-      if (currentCount >= AMPLIFY_TARGET) continue;
-
-      const baseQuestions = await this.questionRepo.find({
-        where: { examTypeSubjectId: ets.id },
-      });
-
-      if (baseQuestions.length === 0) continue;
-
-      const toCreate = AMPLIFY_TARGET - currentCount;
-      const copies: Question[] = [];
-
-      for (let i = 0; i < toCreate; i++) {
-        const source = baseQuestions[i % baseQuestions.length];
-        const version = 2 + Math.floor(i / baseQuestions.length);
-        copies.push(
-          this.questionRepo.create({
-            examTypeSubjectId: source.examTypeSubjectId,
-            passageId: source.passageId,
-            questionText: `[v${version}] ${source.questionText}`,
-            type: source.type,
-            category: source.category,
-            options: source.options,
-            correctAnswer: source.correctAnswer as
-              | string
-              | string[]
-              | Record<string, string>
-              | undefined,
-            topicId: source.topicId,
-            explanationShort: source.explanationShort,
-            explanationLong: source.explanationLong,
-            validationConfig: source.validationConfig,
-            difficulty: source.difficulty,
-            marks: source.marks,
-          }),
-        );
-      }
-
-      if (copies.length > 0) {
-        await this.questionRepo.save(copies);
-        amplified += copies.length;
-      }
-    }
-
-    return {
-      questions: { created, skipped, amplified },
-      configs: { created: configsCreated, skipped: configsSkipped },
     };
   }
 

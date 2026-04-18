@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -19,6 +19,8 @@ import {
 
 @Injectable()
 export class WebhookService {
+  private readonly logger = new Logger(WebhookService.name);
+
   constructor(
     @InjectRepository(WebhookEvent)
     private webhookEventRepo: Repository<WebhookEvent>,
@@ -286,12 +288,12 @@ export class WebhookService {
         providerCustomerId: data.customerCode,
       });
 
-      console.log(
-        `[Webhook] Stored subscription_code ${data.subscriptionCode} on subscription ${subscription.id}`,
+      this.logger.log(
+        `Stored subscription_code ${data.subscriptionCode} on subscription ${subscription.id}`,
       );
     } else {
-      console.warn(
-        `[Webhook] subscription.create: Could not find matching subscription for customer ${data.customerCode}, plan ${data.planCode}`,
+      this.logger.warn(
+        `subscription.create: no matching subscription for customer ${data.customerCode}, plan ${data.planCode}`,
       );
     }
 
@@ -347,12 +349,12 @@ export class WebhookService {
         providerCustomerId: subscription.providerCustomerId,
       });
 
-      console.log(
-        `[Webhook] Subscription renewed: ${subscription.id} (${data.subscriptionCode})`,
+      this.logger.log(
+        `Subscription renewed: ${subscription.id} (${data.subscriptionCode})`,
       );
     } else {
-      console.warn(
-        `[Webhook] invoice.update: Could not find subscription for code ${data.subscriptionCode}`,
+      this.logger.warn(
+        `invoice.update: no subscription for code ${data.subscriptionCode}`,
       );
     }
 
@@ -384,8 +386,8 @@ export class WebhookService {
         subscription.id,
         'payment_failed',
       );
-      console.log(
-        `[Webhook] Subscription payment failed: ${subscription.id} - ${data.description}`,
+      this.logger.warn(
+        `Subscription payment failed: ${subscription.id} - ${data.description}`,
       );
     }
 
@@ -465,8 +467,8 @@ export class WebhookService {
         subscription.id,
         'cancelled',
       );
-      console.log(
-        `[Webhook] Subscription ${subscription.id} cancelled via provider webhook`,
+      this.logger.log(
+        `Subscription ${subscription.id} cancelled via provider webhook`,
       );
     }
 

@@ -7,8 +7,14 @@ import {
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Repository, In, DeepPartial } from 'typeorm';
 import { CreateStudentDto } from './dto/create-student.dto';
+import {
+  ANALYTICS_QUEUE,
+  AnalyticsJobs,
+} from '../analytics/queue/analytics.queue';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { StudentProfile } from './entities/student-profile.entity';
 import { StudentExamType } from './entities/student-exam-type.entity';
@@ -39,8 +45,10 @@ export class StudentsService {
     private flaggedQuestionRepo: Repository<FlaggedQuestion>,
     private loggerService: LoggerService,
     private analyticsService: AnalyticsService,
+    @InjectQueue(ANALYTICS_QUEUE) private readonly analyticsQueue: Queue,
     @Inject(forwardRef(() => ExamsService))
     private readonly examsService: ExamsService,
+    @Inject(forwardRef(() => SubscriptionsService))
     private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
@@ -583,17 +591,6 @@ export class StudentsService {
     );
 
     await this.studentExamTypeSubjectRepo.save(newSubjects);
-
-    // Log the update
-    await this.loggerService.log({
-      userId,
-      action: LogActionTypes.UPDATE,
-      description: 'Student updated subjects',
-      metadata: {
-        examTypeId,
-        subjectIds,
-      },
-    });
 
     // Return the updated subjects
     return {
@@ -1402,6 +1399,70 @@ export class StudentsService {
     );
   }
 
+  // ─── Exam Access Management (called by SubscriptionsService) ────────────────
+
+  async findOrCreateStudentExamType(
+    studentId: string,
+    examTypeId: string,
+  ): Promise<StudentExamType> {
+    let record = await this.studentExamTypeRepo.findOne({
+      where: { studentId, examTypeId },
+    });
+    if (!record) {
+      record = this.studentExamTypeRepo.create({
+        studentId,
+        examTypeId,
+        isPaid: false,
+        isDemoAllowed: false,
+      });
+      await this.studentExamTypeRepo.save(record);
+    }
+    return record;
+  }
+
+  async grantExamAccess(
+    studentExamTypeId: string,
+    subscriptionId: string,
+  ): Promise<void> {
+    await this.studentExamTypeRepo.update(
+      { id: studentExamTypeId },
+      { isPaid: true, subscriptionId },
+    );
+  }
+
+  async revokeExamAccessBySubscription(subscriptionId: string): Promise<void> {
+    await this.studentExamTypeRepo.update(
+      { subscriptionId },
+      { isPaid: false, subscriptionId: null as unknown as string },
+    );
+  }
+
+  async revokeExamAccess(studentId: string, examTypeId: string): Promise<void> {
+    await this.studentExamTypeRepo.update(
+      { studentId, examTypeId },
+      { isPaid: false, subscriptionId: null as unknown as string },
+    );
+  }
+
+  async markStudentAsSubscribed(userId: string): Promise<void> {
+    const student = await this.studentProfileRepo.findOne({
+      where: { userId },
+    });
+    if (student && !student.hasEverSubscribed) {
+      await this.studentProfileRepo.update(
+        { id: student.id },
+        { hasEverSubscribed: true },
+      );
+    }
+  }
+
+  async hasStudentEverSubscribed(userId: string): Promise<boolean> {
+    const student = await this.studentProfileRepo.findOne({
+      where: { userId },
+    });
+    return !!student?.hasEverSubscribed;
+  }
+
   async recordDailyCheckIn(userId: string): Promise<void> {
     const student = await this.studentProfileRepo.findOne({
       where: { userId },
@@ -1411,7 +1472,8 @@ export class StudentsService {
       return; // Not a student, silently ignore
     }
 
-    // TODO: Move to RabbitMQ/Kafka - non-blocking streak update
-    await this.analyticsService.updateStudentStreak(student.id);
+    await this.analyticsQueue.add(AnalyticsJobs.UPDATE_STREAK, {
+      studentId: student.id,
+    });
   }
 }

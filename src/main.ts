@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import { NestFactory, Reflector } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -10,10 +10,17 @@ import { ApiKeyGuard } from './common/guards';
 import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  const app = await NestFactory.create(AppModule, {
+    logger: isProduction
+      ? ['error', 'warn']
+      : ['log', 'debug', 'error', 'warn', 'verbose'],
+  });
 
   const configService = app.get(ConfigService);
   const reflector = app.get(Reflector);
+  const logger = new Logger('Bootstrap');
 
   // ========== Global Prefix ==========
   app.setGlobalPrefix('api/v1');
@@ -50,8 +57,8 @@ async function bootstrap() {
   const port = configService.get('PORT', 3000);
   await app.listen(port as string);
 
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`📚 API Base URL: http://localhost:${port}/api/v1`);
+  logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`API Base URL: http://localhost:${port}/api/v1`);
 }
 
 bootstrap();

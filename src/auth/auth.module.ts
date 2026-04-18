@@ -4,6 +4,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
+import { BullModule } from '@nestjs/bullmq';
+import { EMAILS_QUEUE } from '../email/queue/email.queue';
 import {
   GoogleStrategy,
   JwtStrategy,
@@ -43,6 +45,7 @@ import { LoggerModule } from '../logger/logger.module';
     }),
 
     EmailModule,
+    BullModule.registerQueue({ name: EMAILS_QUEUE }),
     PassportModule,
     UsersModule,
     StudentsModule,

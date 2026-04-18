@@ -1,5 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bullmq';
+import { ANALYTICS_QUEUE } from '../analytics/queue/analytics.queue';
 import { StudentsService } from './students.service';
 import { StudentsController } from './students.controller';
 import { StudentProfile } from './entities/student-profile.entity';
@@ -24,9 +26,10 @@ import { StudentActivityInterceptor } from './interceptors';
       QuestionProgress,
       FlaggedQuestion,
     ]),
+    BullModule.registerQueue({ name: ANALYTICS_QUEUE }),
     LoggerModule,
     AnalyticsModule,
-    SubscriptionsModule,
+    forwardRef(() => SubscriptionsModule),
     forwardRef(() => ExamsModule),
   ],
   controllers: [StudentsController],

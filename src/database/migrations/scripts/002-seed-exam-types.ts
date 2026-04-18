@@ -3,11 +3,9 @@ import { IMigration } from '../migration-runner';
 import { ExamType } from '../../../exams/entities/exam-type.entity';
 import { Subject } from '../../../exams/entities/subject.entity';
 import { ExamTypeSubject } from '../../../exams/entities/exam-type-subject.entity';
-import { Topic } from '../../../exams/entities/topic.entity';
 import { ExamConfig } from '../../../exams/entities/exam-config.entity';
 import { examTypesData } from '../../../exams/data/exam-types.data';
 import { subjectsData } from '../../../exams/data/subjects.data';
-import { topicsSeedData } from '../../../exams/data/topics.seed';
 import { examConfigsSeedData } from '../../../exams/data/exam-configs.data';
 
 export const migration002: IMigration = {
@@ -19,7 +17,6 @@ export const migration002: IMigration = {
     const examTypeRepo = dataSource.getRepository(ExamType);
     const subjectRepo = dataSource.getRepository(Subject);
     const etsRepo = dataSource.getRepository(ExamTypeSubject);
-    const topicRepo = dataSource.getRepository(Topic);
     const configRepo = dataSource.getRepository(ExamConfig);
 
     // ── 1. ExamTypes ───────────────────────────────────────────────────────
@@ -78,35 +75,7 @@ export const migration002: IMigration = {
       console.log(`      + Subject: ${data.examTypeName} / ${data.name}`);
     }
 
-    // ── 3. Topics ──────────────────────────────────────────────────────────
-    console.log('    Seeding topics...');
-    let topicsInserted = 0;
-
-    for (const seed of topicsSeedData) {
-      const subjectId = subjectIdMap.get(
-        `${seed.examTypeName}::${seed.subjectName}`,
-      );
-      if (!subjectId) continue;
-
-      const existing = await topicRepo.findOne({
-        where: { subjectId, name: seed.name },
-      });
-
-      if (existing) {
-        if (existing.content !== seed.content) {
-          await topicRepo.update(existing.id, { content: seed.content });
-        }
-        continue;
-      }
-
-      await topicRepo.save(
-        topicRepo.create({ subjectId, name: seed.name, content: seed.content }),
-      );
-      topicsInserted++;
-    }
-    console.log(`      + ${topicsInserted} topics inserted`);
-
-    // ── 4. ExamConfigs ─────────────────────────────────────────────────────
+    // ── 3. ExamConfigs ─────────────────────────────────────────────────────
     console.log('    Seeding exam configs...');
     for (const seed of examConfigsSeedData) {
       const examType = examTypeMap.get(seed.examTypeName);

@@ -5,6 +5,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { LessThan, Repository } from 'typeorm';
 import { RefreshToken } from './entities/refresh-tokens.entity';
 import { PasswordResetToken } from './entities/password-reset-tokens.entity';
@@ -13,6 +15,7 @@ import { OnboardingToken } from './entities/onboarding-token.entity';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
+import { EMAILS_QUEUE, EmailJobs } from '../email/queue/email.queue';
 import { v7 as uuidv7 } from 'uuid';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
@@ -27,7 +30,12 @@ import { StudentsService } from '../students/students.service';
 import { SponsorsService } from '../sponsors/sponsors.service';
 import { AffiliatesService } from '../affiliates/affiliates.service';
 import { LoggerService } from '../logger/logger.service';
-import { SponsorType, LogActionTypes, SponsorInviteStatus } from '../../types';
+import {
+  SponsorType,
+  LogActionTypes,
+  SponsorInviteStatus,
+  LogSeverity,
+} from '../../types';
 
 @Injectable()
 export class AuthService {
@@ -36,6 +44,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    @InjectQueue(EMAILS_QUEUE) private readonly emailQueue: Queue,
     private studentsService: StudentsService,
     private sponsorsService: SponsorsService,
     private affiliatesService: AffiliatesService,
@@ -123,6 +132,13 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      void this.loggerService.log({
+        userId: user.id,
+        action: LogActionTypes.LOGIN,
+        description: 'Failed login attempt (invalid password)',
+        metadata: { email },
+        severity: LogSeverity.WARNING,
+      });
       return null;
     }
 
@@ -321,10 +337,11 @@ export class AuthService {
 
     await this.emailVerificationCodeRepo.save(codeRecord);
 
-    // Send verification email with code
-    await this.emailService.sendVerificationEmail(
-      signUpDto.email,
-      verificationCode,
+    // Send verification email with code (queued — side effect, does not block signup response)
+    await this.emailQueue.add(
+      EmailJobs.SEND_VERIFICATION,
+      { email: signUpDto.email, verificationCode },
+      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
     );
 
     // Log user registration
@@ -436,14 +453,6 @@ export class AuthService {
     // Generate and send new code (deletes old ones)
     await this.generateAndSendVerificationCode(user.id, email);
 
-    // Log resend action
-    await this.loggerService.log({
-      userId: user.id,
-      action: LogActionTypes.OTHER,
-      description: `User requested verification code resend: ${email}`,
-      metadata: { email },
-    });
-
     return { message: 'Verification code resent successfully' };
   }
 
@@ -507,13 +516,17 @@ export class AuthService {
 
     await this.onboardingTokenRepo.save(onboardingToken);
 
-    // Send onboarding email with the token
+    // Send onboarding email with the token (queued — side effect, does not block response)
     const user = await this.usersService.findById(userId);
-    await this.emailService.sendOnboardingEmail(
-      email,
-      user!.firstName,
-      user!.lastName,
-      token,
+    await this.emailQueue.add(
+      EmailJobs.SEND_ONBOARDING,
+      {
+        email,
+        firstName: user!.firstName,
+        lastName: user!.lastName,
+        onboardingToken: token,
+      },
+      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
     );
 
     return token;
@@ -842,12 +855,16 @@ export class AuthService {
     // Mark onboarding token as used
     await this.markOnboardingTokenAsUsed(onboardingToken);
 
-    // Send welcome email after successful onboarding
-    await this.emailService.sendWelcomeEmail(
-      user.email,
-      user.firstName,
-      user.lastName,
-      user.role,
+    // Send welcome email after successful onboarding (queued — side effect, does not block JWT response)
+    await this.emailQueue.add(
+      EmailJobs.SEND_WELCOME,
+      {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userType: user.role,
+      },
+      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
     );
 
     // Log onboarding completion
@@ -1213,8 +1230,12 @@ export class AuthService {
 
     await this.passwordResetTokenRepo.save(resetToken);
 
-    // Send email
-    await this.emailService.sendPasswordResetEmail(email, resetTokenString);
+    // Send password reset email (queued — still reliable via BullMQ retries)
+    await this.emailQueue.add(
+      EmailJobs.SEND_PASSWORD_RESET,
+      { email, resetToken: resetTokenString },
+      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
+    );
 
     return { message: 'Password reset link sent to your email' };
   }
@@ -1256,6 +1277,12 @@ export class AuthService {
 
     // Revoke all refresh tokens (force re-login)
     await this.logoutAll(resetToken.userId);
+
+    void this.loggerService.log({
+      userId: resetToken.userId,
+      action: LogActionTypes.UPDATE,
+      description: 'Password reset completed successfully',
+    });
 
     return { message: 'Password reset successful. Please login again.' };
   }

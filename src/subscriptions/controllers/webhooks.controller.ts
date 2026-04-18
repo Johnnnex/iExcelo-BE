@@ -8,20 +8,21 @@ import {
   Req,
   HttpCode,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
+import { SkipThrottle } from '@nestjs/throttler';
 import { WebhookService } from '../services';
-import { LoggerService } from '../../logger/logger.service';
 import { Public } from '../../common/decorators';
-import { PaymentProvider, LogActionTypes } from '../../../types';
+import { PaymentProvider } from '../../../types';
 
+@SkipThrottle()
 @Controller('webhooks')
 export class WebhooksController {
-  constructor(
-    private readonly webhookService: WebhookService,
-    private readonly loggerService: LoggerService,
-  ) {}
+  private readonly logger = new Logger(WebhooksController.name);
+
+  constructor(private readonly webhookService: WebhookService) {}
 
   /**
    * Stripe webhook endpoint
@@ -48,11 +49,7 @@ export class WebhooksController {
     try {
       event = this.webhookService.verifyStripeSignature(payload, signature);
     } catch (err) {
-      await this.loggerService.log({
-        action: LogActionTypes.ERROR,
-        description: 'Invalid Stripe webhook signature',
-        metadata: { error: err.message },
-      });
+      this.logger.error(`Invalid Stripe webhook signature: ${err.message}`);
       throw new BadRequestException('Invalid Stripe signature');
     }
 
@@ -124,12 +121,7 @@ export class WebhooksController {
           break;
 
         default:
-          // Log unhandled event types
-          await this.loggerService.log({
-            action: LogActionTypes.SYSTEM,
-            description: `Unhandled Stripe event: ${event.type}`,
-            metadata: { eventId: event.id },
-          });
+          this.logger.warn(`Unhandled Stripe event: ${event.type}`);
       }
 
       await this.webhookService.markEventProcessed(webhookEvent.id);
@@ -156,7 +148,9 @@ export class WebhooksController {
     @Headers('x-paystack-signature') signature: string,
     @Body() payload: any,
   ) {
-    console.log('PAYSTACK WEBHOOK PAYLOAD:', JSON.stringify(payload, null, 2));
+    this.logger.debug(
+      `Paystack webhook payload: ${JSON.stringify(payload, null, 2)}`,
+    );
     if (!signature) {
       throw new BadRequestException('Missing Paystack signature');
     }
@@ -168,10 +162,7 @@ export class WebhooksController {
         signature,
       )
     ) {
-      await this.loggerService.log({
-        action: LogActionTypes.ERROR,
-        description: 'Invalid Paystack webhook signature',
-      });
+      this.logger.error('Invalid Paystack webhook signature');
       throw new BadRequestException('Invalid Paystack signature');
     }
 
@@ -212,10 +203,7 @@ export class WebhooksController {
     }
 
     try {
-      console.log(
-        `[Paystack Webhook] Event: ${payload.event}, ID: ${eventId}`,
-        JSON.stringify(payload.data, null, 2),
-      );
+      this.logger.debug(`Paystack event: ${payload.event}, ID: ${eventId}`);
 
       switch (payload.event) {
         case 'charge.success':
@@ -290,16 +278,6 @@ export class WebhooksController {
           break;
 
         case 'invoice.create':
-          // Informational — 3 days before next payment. Just log it.
-          await this.loggerService.log({
-            action: LogActionTypes.SYSTEM,
-            description: 'Paystack invoice created (upcoming renewal)',
-            metadata: {
-              invoiceCode: payload.data.invoice_code,
-              subscriptionCode: payload.data.subscription?.subscription_code,
-              amount: payload.data.amount,
-            },
-          });
           break;
 
         case 'subscription.disable':
@@ -311,11 +289,7 @@ export class WebhooksController {
           break;
 
         default:
-          await this.loggerService.log({
-            action: LogActionTypes.SYSTEM,
-            description: `Unhandled Paystack event: ${payload.event}`,
-            metadata: { eventId },
-          });
+          this.logger.warn(`Unhandled Paystack event: ${payload.event}`);
       }
 
       await this.webhookService.markEventProcessed(webhookEvent.id);

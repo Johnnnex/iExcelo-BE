@@ -1,5 +1,5 @@
 import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
-import { AffiliateProfile } from '../../affiliates/entities/affiliate-profile.entity';
+import { AffiliateProfile } from './affiliate-profile.entity';
 import { BaseEntity } from '../../common/entities';
 import { PayoutStatus } from '../../../types';
 
@@ -31,7 +31,6 @@ export class AffiliatePayout extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   failureReason: string;
 
-  // Relations
   @ManyToOne(() => AffiliateProfile, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'affiliateId' })
   affiliate: AffiliateProfile;

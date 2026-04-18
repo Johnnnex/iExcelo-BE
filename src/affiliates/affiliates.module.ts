@@ -5,7 +5,7 @@ import { AffiliatesController } from './affiliates.controller';
 import { AffiliateProfile } from './entities/affiliate-profile.entity';
 import { AffiliateReferral } from './entities/affiliate-referral.entity';
 import { Commission } from './entities/commission.entity';
-import { AffiliatePayout } from '../analytics/entities/affiliate-payout.entity';
+import { AffiliatePayout } from './entities/affiliate-payout.entity';
 import { LoggerModule } from '../logger/logger.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 

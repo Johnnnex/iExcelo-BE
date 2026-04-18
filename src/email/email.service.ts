@@ -8,6 +8,7 @@ import { getWelcomeEmailTemplate } from './templates/welcome-email.template';
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter;
+  private readonly from: string;
 
   constructor(private configService: ConfigService) {
     this.transporter = nodemailer.createTransport({
@@ -19,6 +20,10 @@ export class EmailService {
         pass: this.configService.get('SMTP_PASS'),
       },
     });
+
+    const address = this.configService.get('SMTP_FROM', 'noreply@iexcelo.com');
+    const name = this.configService.get('SMTP_FROM_NAME', 'iExcelo');
+    this.from = `${name} <${address}>`;
   }
 
   async sendPasswordResetEmail(email: string, resetToken: string) {
@@ -26,7 +31,7 @@ export class EmailService {
     const resetUrl = `${frontendUrl}/reset/confirm?token=${resetToken}`;
 
     await this.transporter.sendMail({
-      from: this.configService.get('SMTP_FROM', 'noreply@iexcelo.com'),
+      from: this.from,
       to: email,
       subject: 'Password Reset Request - iExcelo',
       html: `
@@ -66,7 +71,7 @@ export class EmailService {
 
   async sendVerificationEmail(email: string, verificationCode: string) {
     await this.transporter.sendMail({
-      from: this.configService.get('SMTP_FROM', 'noreply@iexcelo.com'),
+      from: this.from,
       to: email,
       subject: 'Verify Your Email - iExcelo',
       html: `
@@ -112,7 +117,7 @@ export class EmailService {
     const onboardingUrl = `${frontendUrl}/auth/onboarding?token=${onboardingToken}`;
 
     await this.transporter.sendMail({
-      from: this.configService.get('SMTP_FROM', 'noreply@iexcelo.com'),
+      from: this.from,
       to: email,
       subject: 'Welcome to iExcelo - Complete Your Setup',
       html: `
@@ -163,7 +168,7 @@ export class EmailService {
     const activationUrl = `${frontendUrl}/auth/activate?token=${rawToken}`;
 
     await this.transporter.sendMail({
-      from: this.configService.get('SMTP_FROM', 'noreply@iexcelo.com'),
+      from: this.from,
       to: email,
       subject: "You've Been Sponsored on iExcelo — Activate Your Account",
       html: `
@@ -245,7 +250,7 @@ export class EmailService {
         : `${messages.length} new messages waiting for you — iExcelo`;
 
     await this.transporter.sendMail({
-      from: this.configService.get('SMTP_FROM', 'noreply@iexcelo.com'),
+      from: this.from,
       to: email,
       subject,
       html: `
@@ -297,7 +302,7 @@ export class EmailService {
     });
 
     await this.transporter.sendMail({
-      from: this.configService.get('SMTP_FROM', 'noreply@iexcelo.com'),
+      from: this.from,
       to: email,
       subject: template.subject,
       html: template.html,

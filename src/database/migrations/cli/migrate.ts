@@ -25,6 +25,21 @@ import { Passage } from '../../../exams/entities/passage.entity';
 import { RegionCurrency } from '../../../subscriptions/entities/region-currency.entity';
 import { SubscriptionPlan } from '../../../subscriptions/entities/subscription-plan.entity';
 import { PlanPrice } from '../../../subscriptions/entities/plan-price.entity';
+import { Subscription, Transaction } from '../../../subscriptions/entities';
+import { StudentProfile } from '../../../students/entities/student-profile.entity';
+import { User } from '../../../users/entities/user.entity';
+import { RefreshToken } from '../../../auth/entities/refresh-tokens.entity';
+import { SponsorProfile } from '../../../sponsors/entities/sponsor-profile.entity';
+import { Sponsorship } from '../../../sponsors/entities/sponsorship.entity';
+import { Donation } from '../../../sponsors/entities/donation.entity';
+import { SponsorUrl } from '../../../sponsors/entities/sponsor-url.entity';
+import { SponsorStudentInvite } from '../../../sponsors/entities/sponsor-student-invite.entity';
+import { Giveback } from '../../../sponsors/entities/giveback.entity';
+import { AffiliateProfile } from '../../../affiliates/entities/affiliate-profile.entity';
+import { AffiliateReferral } from '../../../affiliates/entities/affiliate-referral.entity';
+import { Commission } from '../../../affiliates/entities/commission.entity';
+import { ExamAttempt } from '../../../students/entities/exam-attempt.entity';
+import { StudentExamType } from '../../../students/entities/student-exam-type.entity';
 
 // ── Migration scripts ─────────────────────────────────────────────────────────
 import { MigrationRunner } from '../migration-runner';
@@ -55,6 +70,22 @@ async function createDataSource(): Promise<DataSource> {
       Passage,
       RegionCurrency,
       SubscriptionPlan,
+      Subscription,
+      StudentProfile,
+      User,
+      RefreshToken,
+      SponsorProfile,
+      Sponsorship,
+      Donation,
+      SponsorStudentInvite,
+      AffiliateProfile,
+      AffiliateReferral,
+      Commission,
+      ExamAttempt,
+      StudentExamType,
+      Giveback,
+      Transaction,
+      SponsorUrl,
       PlanPrice,
     ],
     synchronize: false,

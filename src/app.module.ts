@@ -11,7 +11,8 @@ import { SponsorsModule } from './sponsors/sponsors.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { LoggingInterceptor } from './common/interceptors';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UtilsModule } from './utils/utils.module';
@@ -34,6 +35,8 @@ import { NotificationsModule } from './notifications/notifications.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 120 }]),
 
     // BullMQ global connection — all queue modules share this Redis config
     BullModule.forRootAsync({
@@ -79,6 +82,7 @@ import { NotificationsModule } from './notifications/notifications.module';
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

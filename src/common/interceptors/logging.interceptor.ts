@@ -2,7 +2,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-// src/common/interceptors/logging.interceptor.ts
 import {
   Injectable,
   NestInterceptor,
@@ -14,7 +13,7 @@ import { tap } from 'rxjs/operators';
 import { LoggerService } from '../../logger/logger.service';
 import { LogActionTypes, LogSeverity } from '../../../types';
 import { Reflector } from '@nestjs/core';
-import { LOG_ACTION_KEY, SKIP_LOGGING_KEY } from '../decorators';
+import { SKIP_LOGGING_KEY } from '../decorators';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -24,54 +23,26 @@ export class LoggingInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    // Check if route has @SkipLogging decorator
     const skipLogging = this.reflector.getAllAndOverride<boolean>(
       SKIP_LOGGING_KEY,
       [context.getHandler(), context.getClass()],
     );
 
     if (skipLogging) {
-      return next.handle(); // Skip logging, just pass through
+      return next.handle();
     }
-
-    const customAction = this.reflector.get<LogActionTypes>(
-      LOG_ACTION_KEY,
-      context.getHandler(),
-    );
 
     const request = context.switchToHttp().getRequest();
     const { method, url, ip, headers } = request;
     const userAgent = headers['user-agent'] || '';
     const userId = request.user?.userId || null;
-
     const now = Date.now();
 
     return next.handle().pipe(
       tap({
-        next: () => {
-          const response = context.switchToHttp().getResponse();
-          const delay = Date.now() - now;
-
-          // Log successful requests
-          this.loggerService.log({
-            userId,
-            action: customAction || this.mapMethodToAction(method), // If custom action exists, use it; otherwise use CRUD mapping
-            description: `${method} ${url} - ${response.statusCode}`,
-            metadata: {
-              method,
-              url,
-              statusCode: response.statusCode,
-              responseTime: `${delay}ms`,
-              ip,
-              userAgent,
-            },
-            severity: LogSeverity.INFO,
-          });
-        },
         error: (error) => {
           const delay = Date.now() - now;
 
-          // Log failed requests
           this.loggerService.log({
             userId,
             action: LogActionTypes.ERROR,
@@ -91,17 +62,5 @@ export class LoggingInterceptor implements NestInterceptor {
         },
       }),
     );
-  }
-
-  private mapMethodToAction(method: string): LogActionTypes {
-    const actionMap: Record<string, LogActionTypes> = {
-      GET: LogActionTypes.READ,
-      POST: LogActionTypes.CREATE,
-      PUT: LogActionTypes.UPDATE,
-      PATCH: LogActionTypes.UPDATE,
-      DELETE: LogActionTypes.DELETE,
-    };
-
-    return actionMap[method] || LogActionTypes.OTHER;
   }
 }

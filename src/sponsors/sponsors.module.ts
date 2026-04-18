@@ -1,5 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bullmq';
+import { EMAILS_QUEUE } from '../email/queue/email.queue';
 import { SponsorsService } from './sponsors.service';
 import { SponsorsController } from './sponsors.controller';
 import { SponsorProfile } from './entities/sponsor-profile.entity';
@@ -20,6 +22,7 @@ import { AffiliatesModule } from '../affiliates/affiliates.module';
       SponsorStudentInvite,
       Giveback,
     ]),
+    BullModule.registerQueue({ name: EMAILS_QUEUE }),
     LoggerModule,
     UsersModule,
     forwardRef(() => StudentsModule), // StudentsModule → SubscriptionsModule (no cycle, forwardRef just in case)

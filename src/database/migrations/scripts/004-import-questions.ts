@@ -160,7 +160,7 @@ export const migration004: IMigration = {
     // This script is at: iExcelo/Backend/src/database/migrations/scripts/
     const jsonPath = path.resolve(
       __dirname,
-      '../../../../../../Previous Site Data.json',
+      '../../../../../Previous Site Data.json',
     );
     if (!fs.existsSync(jsonPath)) {
       throw new Error(
@@ -183,15 +183,24 @@ export const migration004: IMigration = {
       }
     }
 
-    const legacyQuestions = (tableMap.get('questions') ??
+    const allLegacyQuestions = (tableMap.get('questions') ??
       []) as LegacyQuestion[];
+    // Deduplicate by questionid — 42 duplicates exist in the legacy export.
+    // Keep first occurrence; duplicates would violate the legacyId UNIQUE constraint.
+    const seenQids = new Set<string>();
+    const legacyQuestions = allLegacyQuestions.filter((q) => {
+      if (seenQids.has(q.questionid)) return false;
+      seenQids.add(q.questionid);
+      return true;
+    });
+
     const legacyOptions = (tableMap.get('options') ?? []) as LegacyOption[];
     const legacySubjects = (tableMap.get('subject') ?? []) as LegacySubject[];
     const legacyTopics = (tableMap.get('topics') ?? []) as LegacyTopic[];
 
     console.log(
-      `    Loaded: ${legacyQuestions.length} questions, ${legacyOptions.length} options, ` +
-        `${legacyTopics.length} topics`,
+      `    Loaded: ${legacyQuestions.length} questions (${allLegacyQuestions.length - legacyQuestions.length} duplicates dropped), ` +
+        `${legacyOptions.length} options, ${legacyTopics.length} topics`,
     );
 
     // ── Build new-schema lookup maps ───────────────────────────────────────
@@ -356,6 +365,7 @@ export const migration004: IMigration = {
         legacyId: legQ.questionid,
       });
       await questionRepo.save(q);
+      importedIds.add(legQ.questionid); // guard against in-memory duplicates
       imported++;
 
       if (imported % 500 === 0) {

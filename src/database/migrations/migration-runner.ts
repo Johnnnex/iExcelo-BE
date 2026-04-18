@@ -46,10 +46,10 @@ export class MigrationRunner {
       await this.historyRepo.save(record);
       console.log(`✅ Completed ${migration.name} in ${record.durationMs}ms`);
     } catch (err) {
-      record.durationMs = Date.now() - start;
-      record.error = err instanceof Error ? err.message : String(err);
-      await this.historyRepo.save(record);
-      console.error(`❌ Failed    ${migration.name}: ${record.error}`);
+      // Do NOT save to migration_history on failure — failed runs should be
+      // retryable without needing to manually delete rows.
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`❌ Failed    ${migration.name}: ${message}`);
       throw err;
     }
   }
@@ -65,8 +65,7 @@ export class MigrationRunner {
       if (entry) {
         const date = entry.ranAt.toISOString().slice(0, 10);
         const dur = entry.durationMs ? ` ${entry.durationMs}ms` : '';
-        const err = entry.error ? ` ❌ ${entry.error.slice(0, 60)}` : '';
-        console.log(`  ✅ ${m.name.padEnd(40)} ran ${date}${dur}${err}`);
+        console.log(`  ✅ ${m.name.padEnd(40)} ran ${date}${dur}`);
       } else {
         console.log(`  ⏳ ${m.name.padEnd(40)} pending`);
       }

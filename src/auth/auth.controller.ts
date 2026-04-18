@@ -33,7 +33,9 @@ import {
   ActivateSponsoredAccountDto,
 } from './dto/create-auth.dto';
 import { Param } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 
+@Throttle({ default: { limit: 10, ttl: 60000 } })
 @Controller('auth')
 export class AuthController {
   constructor(

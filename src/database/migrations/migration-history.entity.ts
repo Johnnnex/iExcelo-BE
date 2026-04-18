@@ -11,7 +11,4 @@ export class MigrationHistory extends BaseEntity {
 
   @Column({ nullable: true })
   durationMs: number;
-
-  @Column({ type: 'text', nullable: true })
-  error: string;
 }

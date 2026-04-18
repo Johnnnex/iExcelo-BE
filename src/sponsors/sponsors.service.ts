@@ -8,6 +8,9 @@ import {
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { EMAILS_QUEUE, EmailJobs } from '../email/queue/email.queue';
 import { ConfigService } from '@nestjs/config';
 import { Repository, Between } from 'typeorm';
 import { DAY_MS } from '../common/constants';
@@ -55,6 +58,7 @@ export class SponsorsService {
     private transactionsService: TransactionsService,
     private affiliatesService: AffiliatesService,
     private emailService: EmailService,
+    @InjectQueue(EMAILS_QUEUE) private readonly emailQueue: Queue,
     private loggerService: LoggerService,
   ) {}
 
@@ -178,12 +182,16 @@ export class SponsorsService {
     });
     await this.sponsorInviteRepo.save(invite);
 
-    // Send activation email to student (raw token goes in URL)
-    await this.emailService.sendSponsoredActivationEmail(
-      data.email,
-      data.firstName,
-      rawToken,
-      sponsorProfile.companyName || 'Your sponsor',
+    // Send activation email to student (queued — side effect, does not block account creation response)
+    await this.emailQueue.add(
+      EmailJobs.SEND_SPONSORED_ACTIVATION,
+      {
+        email: data.email,
+        firstName: data.firstName,
+        rawToken,
+        sponsorName: sponsorProfile.companyName || 'Your sponsor',
+      },
+      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
     );
 
     // Increment totalStudentsSponsored on profile

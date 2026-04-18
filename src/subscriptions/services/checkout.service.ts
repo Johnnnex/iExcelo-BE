@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,6 +15,7 @@ import {
 
 @Injectable()
 export class CheckoutService {
+  private readonly logger = new Logger(CheckoutService.name);
   private stripe: Stripe | null = null;
 
   constructor(
@@ -348,7 +349,7 @@ export class CheckoutService {
       throw new BadRequestException('Paystack is not configured');
     }
 
-    console.log(`[Paystack] Verifying transaction: ${reference}`);
+    this.logger.debug(`Verifying Paystack transaction: ${reference}`);
 
     const response = await fetch(
       `https://api.paystack.co/transaction/verify/${reference}`,
@@ -395,19 +396,14 @@ export class CheckoutService {
       };
     };
 
-    console.log(
-      '[Paystack] Verification response:',
-      JSON.stringify(result, null, 2),
-    );
-
     if (!result.status) {
-      console.log(`[Paystack] Verification failed: ${result.message}`);
+      this.logger.warn(`Paystack verification failed: ${result.message}`);
       return { success: false };
     }
 
     if (result.data?.status !== 'success') {
-      console.log(
-        `[Paystack] Transaction not successful: ${result.data?.status}`,
+      this.logger.warn(
+        `Paystack transaction not successful: ${result.data?.status}`,
       );
       return { success: false };
     }
@@ -439,8 +435,8 @@ export class CheckoutService {
 
       // Activate the subscription (idempotent — safe if webhook already did it)
       await this.subscriptionsService.activateSubscription(subscriptionId);
-      console.log(
-        `[Paystack] Subscription verified and activated: ${subscriptionId}`,
+      this.logger.log(
+        `Paystack subscription verified and activated: ${subscriptionId}`,
       );
     }
 

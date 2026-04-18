@@ -167,22 +167,6 @@ export class ExamsController {
   // ─── Admin ────────────────────────────────────────────────────────────────
 
   /**
-   * Seeds dummy question data for development/testing.
-   * Idempotent — safe to call multiple times.
-   * Admin-only.
-   */
-  @Post('admin/reseed-questions')
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles(UserType.ADMIN)
-  async reseedQuestions() {
-    const result = await this.examsService.seedDummyQuestions();
-    return {
-      message: 'Seed complete',
-      data: result,
-    };
-  }
-
-  /**
    * Diagnostic: shows ETS records, question counts per ETS, and orphaned question count.
    * Use this to verify examTypeSubjectId integrity when questions return empty on exam start.
    */

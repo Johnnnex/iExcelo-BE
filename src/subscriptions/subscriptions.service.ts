@@ -1,6 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Inject,
+  forwardRef,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
+import {
+  ANALYTICS_QUEUE,
+  AnalyticsJobs,
+} from '../analytics/queue/analytics.queue';
 import { Repository, Not, LessThan, MoreThan, Between, In } from 'typeorm';
 import {
   Subscription,
@@ -9,9 +21,8 @@ import {
   PlanPrice,
   RegionCurrency,
 } from './entities';
-import { StudentExamType } from '../students/entities/student-exam-type.entity';
-import { StudentProfile } from '../students/entities/student-profile.entity';
 import { User } from '../users/entities/user.entity';
+import { StudentsService } from '../students/students.service';
 import { ExamType } from '../exams/entities/exam-type.entity';
 import { Giveback } from '../sponsors/entities/giveback.entity';
 import { LoggerService } from '../logger/logger.service';
@@ -35,6 +46,8 @@ import {
 
 @Injectable()
 export class SubscriptionsService {
+  private readonly logger = new Logger(SubscriptionsService.name);
+
   constructor(
     @InjectRepository(Subscription)
     private subscriptionRepo: Repository<Subscription>,
@@ -46,12 +59,13 @@ export class SubscriptionsService {
     private planPriceRepo: Repository<PlanPrice>,
     @InjectRepository(RegionCurrency)
     private regionCurrencyRepo: Repository<RegionCurrency>,
-    @InjectRepository(StudentExamType)
-    private studentExamTypeRepo: Repository<StudentExamType>,
     private configService: ConfigService,
     private loggerService: LoggerService,
     private analyticsService: AnalyticsService,
+    @InjectQueue(ANALYTICS_QUEUE) private readonly analyticsQueue: Queue,
     private affiliatesService: AffiliatesService,
+    @Inject(forwardRef(() => StudentsService))
+    private readonly studentsService: StudentsService,
   ) {}
 
   /**
@@ -100,7 +114,7 @@ export class SubscriptionsService {
     const examTypes = await examTypeRepo.find({ where: { isActive: true } });
 
     if (examTypes.length === 0) {
-      console.warn(
+      this.logger.warn(
         'No active exam types found - cannot seed subscription plans',
       );
       return { plansCreated: 0, pricesCreated: 0 };
@@ -148,7 +162,7 @@ export class SubscriptionsService {
       }
     }
 
-    console.log(
+    this.logger.log(
       `Seeded ${plansCreated} subscription plans with ${pricesCreated} prices for ${examTypes.length} exam types`,
     );
     return { plansCreated, pricesCreated };
@@ -247,22 +261,11 @@ export class SubscriptionsService {
     }
 
     // Find or create StudentExamType (only created after payment succeeds)
-    let studentExamType = await this.studentExamTypeRepo.findOne({
-      where: {
-        studentId: subscription.studentId,
-        examTypeId: subscription.examTypeId,
-      },
-    });
-
-    if (!studentExamType) {
-      studentExamType = this.studentExamTypeRepo.create({
-        studentId: subscription.studentId,
-        examTypeId: subscription.examTypeId,
-        isPaid: false,
-        isDemoAllowed: false,
-      });
-      await this.studentExamTypeRepo.save(studentExamType);
-    }
+    const studentExamType =
+      await this.studentsService.findOrCreateStudentExamType(
+        subscription.studentId,
+        subscription.examTypeId,
+      );
 
     // Calculate dates based on plan duration
     const startDate = new Date();
@@ -277,13 +280,9 @@ export class SubscriptionsService {
     subscription.studentExamTypeId = studentExamType.id;
     await this.subscriptionRepo.save(subscription);
 
-    // Update StudentExamType isPaid = true
-    await this.studentExamTypeRepo.update(
-      { id: studentExamType.id },
-      {
-        isPaid: true,
-        subscriptionId: subscription.id,
-      },
+    await this.studentsService.grantExamAccess(
+      studentExamType.id,
+      subscription.id,
     );
 
     // Log activation
@@ -298,28 +297,22 @@ export class SubscriptionsService {
       },
     });
 
-    // TODO: [ANALYTICS - MOVE TO MESSAGING QUEUE]
-    // Track platform analytics for successful subscription
-    await this.analyticsService.trackPlatformAnalytics({
-      newSubscriptions: 1,
-      totalRevenue: subscription.amountPaid,
-      premiumUsers: 1,
+    // Track platform analytics (queued — side effect, does not block activation response)
+    await this.analyticsQueue.add(AnalyticsJobs.TRACK_PLATFORM, {
+      data: {
+        newSubscriptions: 1,
+        totalRevenue: subscription.amountPaid,
+        premiumUsers: 1,
+      },
     });
 
     // Mark student as having ever subscribed (gates commission earning for student referrers)
     // Affiliate profile is now created eagerly at signup — no lazy creation needed here.
     if (subscription.student?.userId) {
       try {
-        const studentProfile = await this.subscriptionRepo.manager
-          .getRepository(StudentProfile)
-          .findOne({ where: { userId: subscription.student.userId } });
-
-        if (studentProfile && !studentProfile.hasEverSubscribed) {
-          studentProfile.hasEverSubscribed = true;
-          await this.subscriptionRepo.manager
-            .getRepository(StudentProfile)
-            .save(studentProfile);
-        }
+        await this.studentsService.markStudentAsSubscribed(
+          subscription.student.userId,
+        );
       } catch {
         // Don't fail activation if student profile update fails
       }
@@ -345,30 +338,25 @@ export class SubscriptionsService {
               // If affiliate is a student, they must have subscribed before to earn commissions
               let canEarn = true;
               if (affiliateUser.role === UserType.STUDENT) {
-                const affiliateStudentProfile =
-                  await this.subscriptionRepo.manager
-                    .getRepository(StudentProfile)
-                    .findOne({
-                      where: { userId: affiliateProfile.userId },
-                    });
-                if (
-                  !affiliateStudentProfile ||
-                  !affiliateStudentProfile.hasEverSubscribed
-                ) {
-                  canEarn = false;
-                }
+                canEarn = await this.studentsService.hasStudentEverSubscribed(
+                  affiliateProfile.userId,
+                );
               }
 
               if (canEarn) {
-                // TODO: Move to Kafka/message queue for async processing
-                await this.affiliatesService.createCommission({
-                  affiliateId: referral.affiliateId,
-                  referralId: referral.id,
-                  subscriptionId: subscription.id,
-                  subscriptionAmount: subscription.amountPaid,
-                  currency: subscription.currency,
-                  planName: subscription.plan?.name,
-                });
+                // Commission creation (queued inline via promise — non-blocking, errors caught by outer try/catch)
+                void this.affiliatesService
+                  .createCommission({
+                    affiliateId: referral.affiliateId,
+                    referralId: referral.id,
+                    subscriptionId: subscription.id,
+                    subscriptionAmount: subscription.amountPaid,
+                    currency: subscription.currency,
+                    planName: subscription.plan?.name,
+                  })
+                  .catch(() => {
+                    // Don't fail activation if commission creation fails
+                  });
               }
             }
           }
@@ -381,11 +369,11 @@ export class SubscriptionsService {
             await this.affiliatesService.incrementConversions(
               referral.affiliateId,
             );
-            // TODO: Move to Kafka/message queue for async processing
-            await this.analyticsService.trackAffiliateDailyAnalytics(
-              referral.affiliateId,
-              { conversions: 1 },
-            );
+            // Track affiliate analytics (queued — side effect)
+            await this.analyticsQueue.add(AnalyticsJobs.TRACK_AFFILIATE_DAILY, {
+              affiliateId: referral.affiliateId,
+              data: { conversions: 1 },
+            });
           }
         }
       } catch {
@@ -431,9 +419,8 @@ export class SubscriptionsService {
     // Only revoke isPaid for payment_failed (immediate) and expired (if no other active sub).
     // Cancelled: student keeps access until endDate — reconcile handles the rest.
     if (reason === 'payment_failed') {
-      await this.studentExamTypeRepo.update(
-        { subscriptionId: subscription.id },
-        { isPaid: false, subscriptionId: null },
+      await this.studentsService.revokeExamAccessBySubscription(
+        subscription.id,
       );
     } else if (reason === 'expired') {
       const otherActiveSub = await this.subscriptionRepo.findOne({
@@ -445,9 +432,8 @@ export class SubscriptionsService {
         },
       });
       if (!otherActiveSub) {
-        await this.studentExamTypeRepo.update(
-          { subscriptionId: subscription.id },
-          { isPaid: false, subscriptionId: null },
+        await this.studentsService.revokeExamAccessBySubscription(
+          subscription.id,
         );
       }
     }
@@ -463,17 +449,16 @@ export class SubscriptionsService {
       },
     });
 
-    // TODO: [ANALYTICS - MOVE TO MESSAGING QUEUE]
-    // Track platform analytics for subscription churn
+    // Track platform analytics for subscription churn (queued — side effect)
     if (reason === 'cancelled') {
-      await this.analyticsService.trackPlatformAnalytics({
-        cancelledSubscriptions: 1,
+      await this.analyticsQueue.add(AnalyticsJobs.TRACK_PLATFORM, {
+        data: { cancelledSubscriptions: 1 },
       });
     }
 
     if (reason !== 'cancelled') {
-      await this.analyticsService.trackPlatformAnalytics({
-        premiumUsers: -1,
+      await this.analyticsQueue.add(AnalyticsJobs.TRACK_PLATFORM, {
+        data: { premiumUsers: -1 },
       });
     }
   }
@@ -646,35 +631,24 @@ export class SubscriptionsService {
 
     // 4. If we expired something and no live sub or ready scheduled sub remains → revoke access
     if (outdatedSubs.length > 0 && !liveSubInRange && !scheduledReady) {
-      await this.studentExamTypeRepo.update(
-        { studentId, examTypeId },
-        { isPaid: false, subscriptionId: null },
-      );
+      await this.studentsService.revokeExamAccess(studentId, examTypeId);
     }
 
     // 5. Promote SCHEDULED sub if its startDate has arrived
     if (scheduledReady && scheduled) {
-      let studentExamType = await this.studentExamTypeRepo.findOne({
-        where: { studentId, examTypeId },
-      });
-
-      if (!studentExamType) {
-        studentExamType = this.studentExamTypeRepo.create({
+      const studentExamType =
+        await this.studentsService.findOrCreateStudentExamType(
           studentId,
           examTypeId,
-          isPaid: false,
-          isDemoAllowed: false,
-        });
-        await this.studentExamTypeRepo.save(studentExamType);
-      }
+        );
 
       scheduled.status = SubscriptionStatus.ACTIVE;
       scheduled.studentExamTypeId = studentExamType.id;
       await this.subscriptionRepo.save(scheduled);
 
-      await this.studentExamTypeRepo.update(
-        { id: studentExamType.id },
-        { isPaid: true, subscriptionId: scheduled.id },
+      await this.studentsService.grantExamAccess(
+        studentExamType.id,
+        scheduled.id,
       );
     }
   }
@@ -1151,29 +1125,18 @@ export class SubscriptionsService {
 
     // If revived from EXPIRED/SUSPENDED: restore isPaid on StudentExamType
     if (!wasActive) {
-      let studentExamType = await this.studentExamTypeRepo.findOne({
-        where: {
-          studentId: subscription.studentId,
-          examTypeId: subscription.examTypeId,
-        },
-      });
-
-      if (!studentExamType) {
-        studentExamType = this.studentExamTypeRepo.create({
-          studentId: subscription.studentId,
-          examTypeId: subscription.examTypeId,
-          isPaid: false,
-          isDemoAllowed: false,
-        });
-        await this.studentExamTypeRepo.save(studentExamType);
-      }
+      const studentExamType =
+        await this.studentsService.findOrCreateStudentExamType(
+          subscription.studentId,
+          subscription.examTypeId,
+        );
 
       subscription.studentExamTypeId = studentExamType.id;
       await this.subscriptionRepo.save(subscription);
 
-      await this.studentExamTypeRepo.update(
-        { id: studentExamType.id },
-        { isPaid: true, subscriptionId: subscription.id },
+      await this.studentsService.grantExamAccess(
+        studentExamType.id,
+        subscription.id,
       );
     }
 
@@ -1189,10 +1152,9 @@ export class SubscriptionsService {
       },
     });
 
-    // TODO: [ANALYTICS - MOVE TO MESSAGING QUEUE]
-    // Track renewal revenue
-    await this.analyticsService.trackPlatformAnalytics({
-      totalRevenue: amount,
+    // Track renewal revenue (queued — side effect)
+    await this.analyticsQueue.add(AnalyticsJobs.TRACK_PLATFORM, {
+      data: { totalRevenue: amount },
     });
 
     // Affiliate commission on renewal
@@ -1220,30 +1182,25 @@ export class SubscriptionsService {
                 // If affiliate is a student, they must have subscribed before to earn commissions
                 let canEarn = true;
                 if (affiliateUser.role === UserType.STUDENT) {
-                  const affiliateStudentProfile =
-                    await this.subscriptionRepo.manager
-                      .getRepository(StudentProfile)
-                      .findOne({
-                        where: { userId: affiliateProfile.userId },
-                      });
-                  if (
-                    !affiliateStudentProfile ||
-                    !affiliateStudentProfile.hasEverSubscribed
-                  ) {
-                    canEarn = false;
-                  }
+                  canEarn = await this.studentsService.hasStudentEverSubscribed(
+                    affiliateProfile.userId,
+                  );
                 }
 
                 if (canEarn) {
-                  // TODO: Move to Kafka/message queue for async processing
-                  await this.affiliatesService.createCommission({
-                    affiliateId: referral.affiliateId,
-                    referralId: referral.id,
-                    subscriptionId: subWithStudent.id,
-                    subscriptionAmount: amount,
-                    currency: subWithStudent.currency,
-                    planName: subWithStudent.plan?.name,
-                  });
+                  // Renewal commission (non-blocking — errors caught by outer try/catch)
+                  void this.affiliatesService
+                    .createCommission({
+                      affiliateId: referral.affiliateId,
+                      referralId: referral.id,
+                      subscriptionId: subWithStudent.id,
+                      subscriptionAmount: amount,
+                      currency: subWithStudent.currency,
+                      planName: subWithStudent.plan?.name,
+                    })
+                    .catch(() => {
+                      // Don't fail renewal if commission creation fails
+                    });
                 }
               }
             }
@@ -1373,18 +1330,13 @@ export class SubscriptionsService {
         ip.startsWith('172.31.');
 
       if (isLocalIp) {
-        console.log(
-          `[IP Detection] Local IP detected (${ip}), fetching public IP...`,
-        );
+        this.logger.debug(`Local IP detected (${ip}), fetching public IP...`);
 
-        // Fetch the server's public IP
         const publicIpResponse = await fetch(
           'https://api64.ipify.org?format=json',
         );
         if (!publicIpResponse.ok) {
-          console.log(
-            '[IP Detection] Failed to fetch public IP, returning DEFAULT',
-          );
+          this.logger.warn('Failed to fetch public IP, returning DEFAULT');
           return 'DEFAULT';
         }
 
@@ -1392,13 +1344,11 @@ export class SubscriptionsService {
         ip = publicIpData.ip || '';
 
         if (!ip) {
-          console.log(
-            '[IP Detection] No public IP returned, returning DEFAULT',
-          );
+          this.logger.warn('No public IP returned, returning DEFAULT');
           return 'DEFAULT';
         }
 
-        console.log(`[IP Detection] Using public IP: ${ip}`);
+        this.logger.debug(`Using public IP: ${ip}`);
       }
 
       const response = await fetch(
@@ -1406,7 +1356,7 @@ export class SubscriptionsService {
       );
 
       if (!response.ok) {
-        console.log(`[IP Detection] API request failed for IP: ${ip}`);
+        this.logger.warn(`IP-API request failed for IP: ${ip}`);
         return 'DEFAULT';
       }
 
@@ -1416,19 +1366,14 @@ export class SubscriptionsService {
         message?: string;
       };
 
-      console.log(`[IP Detection] IP: ${ip} -> Result:`, data);
-
       if (data.status === 'fail') {
-        console.log(`[IP Detection] API returned failure: ${data.message}`);
+        this.logger.warn(`IP-API returned failure for ${ip}: ${data.message}`);
         return 'DEFAULT';
       }
 
       return data.countryCode || 'DEFAULT';
     } catch (error) {
-      console.error(
-        `[IP Detection] Error detecting region for IP ${ipAddress}:`,
-        error,
-      );
+      this.logger.error(`Error detecting region for IP ${ipAddress}: ${error}`);
       return 'DEFAULT';
     }
   }
@@ -1656,8 +1601,8 @@ export class SubscriptionsService {
       );
 
       if (!subResponse.ok) {
-        console.error(
-          `[Paystack] Reactivate: Failed to fetch subscription ${subscriptionCode}, status ${subResponse.status}`,
+        this.logger.error(
+          `Paystack reactivate: failed to fetch subscription ${subscriptionCode} (status ${subResponse.status})`,
         );
         return false;
       }
@@ -1667,14 +1612,14 @@ export class SubscriptionsService {
         data?: { email_token: string; status: string };
       };
 
-      console.log(
-        `[Paystack] Reactivate: Subscription ${subscriptionCode} status: ${subResult.data?.status}`,
+      this.logger.debug(
+        `Paystack reactivate: subscription ${subscriptionCode} status ${subResult.data?.status}`,
       );
 
       const emailToken = subResult.data?.email_token;
       if (!emailToken) {
-        console.error(
-          `[Paystack] Reactivate: No email_token for ${subscriptionCode}`,
+        this.logger.error(
+          `Paystack reactivate: no email_token for ${subscriptionCode}`,
         );
         return false;
       }
@@ -1700,14 +1645,13 @@ export class SubscriptionsService {
         message?: string;
       };
 
-      console.log(
-        `[Paystack] Reactivate response for ${subscriptionCode}:`,
-        JSON.stringify(result),
+      this.logger.debug(
+        `Paystack reactivate response for ${subscriptionCode}: ${JSON.stringify(result)}`,
       );
 
       return result.status === true;
     } catch (error) {
-      console.error('[Paystack] Reactivate error:', error);
+      this.logger.error(`Paystack reactivate error: ${error}`);
       return false;
     }
   }
@@ -1740,13 +1684,12 @@ export class SubscriptionsService {
       };
 
       const authCode = result.data?.authorization?.authorization_code || null;
-      console.log(
-        `[Paystack] Get auth code for ${subscriptionCode}: ${authCode ? 'found' : 'NOT FOUND'}`,
-        JSON.stringify(result.data?.authorization, null, 2),
+      this.logger.debug(
+        `Paystack auth code for ${subscriptionCode}: ${authCode ? 'found' : 'NOT FOUND'}`,
       );
       return authCode;
     } catch (error) {
-      console.error('[Paystack] Get auth code error:', error);
+      this.logger.error(`Paystack get auth code error: ${error}`);
       return null;
     }
   }
@@ -1789,22 +1732,19 @@ export class SubscriptionsService {
         data?: { subscription_code: string };
       };
 
-      console.log(
-        '[Paystack] Create subscription response:',
-        JSON.stringify(result, null, 2),
-      );
-
       if (!result.status || !result.data?.subscription_code) {
-        console.error(
-          `[Paystack] Create subscription failed: ${result.message}`,
-          JSON.stringify(body),
+        this.logger.error(
+          `Paystack create subscription failed: ${result.message}`,
         );
         return null;
       }
 
+      this.logger.log(
+        `Paystack subscription created: ${result.data.subscription_code}`,
+      );
       return { subscriptionCode: result.data.subscription_code };
     } catch (error) {
-      console.error('[Paystack] Create subscription error:', error);
+      this.logger.error(`Paystack create subscription error: ${error}`);
       return null;
     }
   }

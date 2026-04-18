@@ -5,7 +5,7 @@ import { DAY_MS } from '../common/constants';
 import { AffiliateProfile } from './entities/affiliate-profile.entity';
 import { AffiliateReferral } from './entities/affiliate-referral.entity';
 import { Commission } from './entities/commission.entity';
-import { AffiliatePayout } from '../analytics/entities/affiliate-payout.entity';
+import { AffiliatePayout } from './entities/affiliate-payout.entity';
 import { LoggerService } from '../logger/logger.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import {
@@ -166,16 +166,6 @@ export class AffiliatesService {
     // TODO: Move to Kafka/message queue for async processing
     await this.analyticsService.trackAffiliateDailyAnalytics(data.affiliateId, {
       newReferrals: 1,
-    });
-
-    await this.loggerService.log({
-      action: LogActionTypes.CREATE,
-      description: 'Affiliate referral created',
-      metadata: {
-        affiliateId: data.affiliateId,
-        referredUserId: data.referredUserId,
-        userType: data.userType,
-      },
     });
 
     return savedReferral;

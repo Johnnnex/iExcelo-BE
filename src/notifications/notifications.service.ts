@@ -7,8 +7,15 @@ import { Queue } from 'bullmq';
 import { Notification } from './entities/notification.entity';
 import { NotificationType } from './entities/notification.entity';
 import { PushService } from './push/push.service';
-import { User } from '../users/entities/user.entity';
+import { UsersService } from '../users/users.service';
 import { UserType } from '../../types';
+
+type UserRecipient = {
+  id: string;
+  email: string;
+  firstName: string;
+  role: string;
+};
 import {
   NOTIFICATIONS_QUEUE,
   NotificationJobs,
@@ -56,11 +63,10 @@ export class NotificationsService {
   constructor(
     @InjectRepository(Notification)
     private readonly notifRepo: Repository<Notification>,
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
     @InjectQueue(NOTIFICATIONS_QUEUE)
     private readonly notifQueue: Queue,
     private readonly pushService: PushService,
+    private readonly usersService: UsersService,
   ) {}
 
   // ─── Public API ─────────────────────────────────────────────────────────────
@@ -87,16 +93,10 @@ export class NotificationsService {
         return null;
       }
 
-      const recipient = await this.userRepo.findOne({
-        where: { id: dto.recipientId },
-        select: ['id', 'email', 'firstName', 'role'],
-      });
+      const recipient = await this.usersService.findById(dto.recipientId);
       if (!recipient) return null;
 
-      const sender = await this.userRepo.findOne({
-        where: { id: dto.senderId },
-        select: ['id', 'firstName', 'lastName'],
-      });
+      const sender = await this.usersService.findById(dto.senderId);
       const senderName = sender
         ? `${sender.firstName} ${sender.lastName}`
         : 'Someone';
@@ -217,10 +217,7 @@ export class NotificationsService {
     dto: NotifyNewChatroomDto,
   ): Promise<Notification | null> {
     try {
-      const recipient = await this.userRepo.findOne({
-        where: { id: dto.recipientId },
-        select: ['id', 'email', 'firstName', 'role'],
-      });
+      const recipient = await this.usersService.findById(dto.recipientId);
       if (!recipient) return null;
 
       const url = this.messagesUrl(recipient.role, dto.chatroomId);
@@ -382,7 +379,7 @@ export class NotificationsService {
    * - Hard cap: total wait never exceeds 5 min from first message
    */
   private async scheduleMsgNotificationBatch(
-    recipient: Pick<User, 'id' | 'email' | 'firstName' | 'role'>,
+    recipient: UserRecipient,
     opts: {
       chatroomId: string;
       senderId: string;
@@ -466,7 +463,7 @@ export class NotificationsService {
    * jobId = email-batch:{userId} — deduplication across all chatrooms per user.
    */
   private async scheduleEmailBatch(
-    recipient: Pick<User, 'id' | 'email' | 'firstName'>,
+    recipient: Omit<UserRecipient, 'role'>,
     message: EmailBatchMessage,
   ): Promise<void> {
     const jobId = `email-batch:${recipient.id}`;
