@@ -131,9 +131,15 @@ export class ExamsController {
 
   @Get('subjects/:subjectId/topics')
   @UseGuards(JwtAuthGuard)
-  async getTopicsForSubject(@Param('subjectId') subjectId: string) {
-    const topics = await this.examsService.getTopicsForSubject(subjectId);
-    return { message: 'Topics retrieved', data: topics };
+  async getTopicsForSubject(
+    @Param('subjectId') subjectId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const p = page ? parseInt(page, 10) : undefined;
+    const l = limit ? parseInt(limit, 10) : undefined;
+    const result = await this.examsService.getTopicsForSubject(subjectId, p, l);
+    return { message: 'Topics retrieved', data: result };
   }
 
   @Get('topics/search')
@@ -151,9 +157,11 @@ export class ExamsController {
   async getTopicsByExamType(
     @Param('examTypeId') examTypeId: string,
     @Query('subjectIds') subjectIds?: string,
+    @Query('limit') limit?: string,
   ) {
     const ids = subjectIds ? subjectIds.split(',').filter(Boolean) : undefined;
-    const topics = await this.examsService.getTopicsByExamType(examTypeId, ids);
+    const l = limit ? parseInt(limit, 10) : undefined;
+    const topics = await this.examsService.getTopicsByExamType(examTypeId, ids, l);
     return { message: 'Topics retrieved', data: topics };
   }
 

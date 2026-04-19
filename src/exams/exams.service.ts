@@ -1075,10 +1075,20 @@ export class ExamsService {
   // ─── Topics API ───────────────────────────────────────────────────────────
 
   /**
-   * Returns all active topics for a subject.
-   * Used by the "View Topics" accordion on the Exams page.
+   * Returns active topics for a subject.
+   * When page+limit are provided, returns paginated { topics, total, hasMore }.
+   * Without page/limit, returns a flat array (used by the Exams page accordion).
    */
-  async getTopicsForSubject(subjectId: string) {
+  async getTopicsForSubject(subjectId: string, page?: number, limit?: number) {
+    if (page !== undefined && limit !== undefined) {
+      const [topics, total] = await this.topicRepo.findAndCount({
+        where: { subjectId, isActive: true },
+        order: { name: 'ASC' },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+      return { topics, total, hasMore: page * limit < total };
+    }
     return this.topicRepo.find({
       where: { subjectId, isActive: true },
       order: { name: 'ASC' },
@@ -1111,11 +1121,14 @@ export class ExamsService {
   }
 
   /**
-   * Returns all subjects with their topics for a given exam type.
-   * For the /student/topics page accordion.
-   * subjectIds filter is used for demo users (show only selected subjects).
+   * Returns subjects with their first `limit` topics and total count per subject.
+   * For the /student/topics page — initial load fetches total + first page in one call.
    */
-  async getTopicsByExamType(examTypeId: string, subjectIds?: string[]) {
+  async getTopicsByExamType(
+    examTypeId: string,
+    subjectIds?: string[],
+    limit = 20,
+  ) {
     const etsRecords = await this.examTypeSubjectRepo.find({
       where: {
         examTypeId,
@@ -1130,14 +1143,17 @@ export class ExamsService {
 
     return Promise.all(
       activeEts.map(async (ets) => {
-        const topics = await this.topicRepo.find({
+        const [topics, total] = await this.topicRepo.findAndCount({
           where: { subjectId: ets.subjectId, isActive: true },
           order: { name: 'ASC' },
+          take: limit,
         });
         return {
           subjectId: ets.subjectId,
           subjectName: ets.subject.name,
           topics,
+          total,
+          hasMore: total > limit,
         };
       }),
     );

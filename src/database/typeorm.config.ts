@@ -22,7 +22,7 @@ export default new DataSource({
   password: process.env.DATABASE_PASSWORD ?? 'postgres',
   database: process.env.DATABASE_NAME ?? 'iexcelo',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  migrations: [__dirname + '/typeorm-migrations/*{.ts,.js}'],
+  migrations: [__dirname + '/migrations/typeorm/*{.ts,.js}'],
   migrationsTableName: 'typeorm_migrations',
   synchronize: false,
   ssl:
