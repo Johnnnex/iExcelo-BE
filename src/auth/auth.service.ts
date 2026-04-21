@@ -399,6 +399,18 @@ export class AuthService {
     // Mark user email as verified
     await this.usersService.update(user.id, { emailVerified: true });
 
+    // Queue welcome email (non-blocking side effect)
+    await this.emailQueue.add(
+      EmailJobs.SEND_WELCOME,
+      {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userType: user.role ?? undefined,
+      },
+      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
+    );
+
     // Log email verification
     await this.loggerService.log({
       userId: user.id,

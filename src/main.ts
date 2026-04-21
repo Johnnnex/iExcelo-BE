@@ -14,7 +14,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {
     logger: isProduction
-      ? ['error', 'warn']
+      ? false
       : ['log', 'debug', 'error', 'warn', 'verbose'],
   });
 
