@@ -62,6 +62,7 @@ jobs:
         with:
           workload_identity_provider: 'projects/449525596304/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'iexcelo-deployer@iexcelo.iam.gserviceaccount.com'
+          token_format: 'access_token'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
