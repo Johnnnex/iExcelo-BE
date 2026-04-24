@@ -24,11 +24,11 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   /**
-   * Upload an image to Cloudinary.
+   * Upload an image to Cloudflare R2.
    * Returns a CDN URL for inline markdown insertion: ![alt](url)
    * Accessible by ADMIN, SPONSOR, and STUDENT roles.
    *
-   * @param folder  Cloudinary sub-folder under iexcelo/ (e.g. "questions", "chat"). Defaults to "questions".
+   * @param folder  Sub-folder under iexcelo/ (e.g. "questions", "chat"). Defaults to "questions".
    */
   @Post('image')
   @UseInterceptors(

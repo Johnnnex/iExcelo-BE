@@ -1,43 +1,37 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { v2 as cloudinary } from 'cloudinary';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import 'multer';
 
 @Injectable()
 export class UploadService {
+  private readonly s3: S3Client;
+  private readonly bucket: string;
+  private readonly publicUrl: string;
+
   constructor(private readonly configService: ConfigService) {
-    cloudinary.config({
-      cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
-      api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
-      api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
+    this.bucket = this.configService.get<string>('R2_BUCKET_NAME');
+    this.publicUrl = this.configService.get<string>('R2_PUBLIC_URL');
+    this.s3 = new S3Client({
+      region: 'auto',
+      endpoint: `https://${this.configService.get<string>('CLOUDFLARE_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: this.configService.get<string>('R2_ACCESS_KEY_ID'),
+        secretAccessKey: this.configService.get<string>('R2_SECRET_ACCESS_KEY'),
+      },
     });
   }
 
-  /**
-   * Uploads a file buffer to Cloudinary using upload_stream (no base64 overhead).
-   * Returns the secure CDN URL to be inserted inline in markdown: ![alt](url)
-   */
-  async uploadImage(
-    file: Express.Multer.File,
-    folder: string,
-  ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: `iexcelo/${folder}`,
-          resource_type: 'image',
-          quality: 'auto',
-          fetch_format: 'auto',
-        },
-        (error, result) => {
-          if (error || !result) {
-            return reject(
-              new InternalServerErrorException('Image upload failed'),
-            );
-          }
-          resolve(result.secure_url);
-        },
-      );
-      stream.end(file.buffer);
-    });
+  async uploadImage(file: Express.Multer.File, folder: string): Promise<string> {
+    const key = `iexcelo/${folder}/${crypto.randomUUID()}`;
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }),
+    );
+    return `${this.publicUrl}/${key}`;
   }
 }

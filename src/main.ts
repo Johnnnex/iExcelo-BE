@@ -13,9 +13,7 @@ async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
 
   const app = await NestFactory.create(AppModule, {
-    logger: isProduction
-      ? false
-      : ['log', 'debug', 'error', 'warn', 'verbose'],
+    logger: isProduction ? false : ['log', 'debug', 'error', 'warn', 'verbose'],
   });
 
   const configService = app.get(ConfigService);

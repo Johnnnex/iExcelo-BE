@@ -1,0 +1,99 @@
+name: Backend — Lint & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGION: us-central1 # will change to europe-west1 once affordable
+  REPO: iexcelo
+  SERVICE: iexcelo-backend
+
+jobs:
+  # ── Lint ────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+
+  # ── Tests (will uncomment when I add tests) ────────────────────────────────────
+  # test:
+  #   name: Test
+  #   runs-on: ubuntu-latest
+  #   needs: lint
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: npm
+  #         cache-dependency-path: package-lock.json
+  #     - run: npm ci
+  #     - run: npm test
+
+  # ── Deploy (main branch only) ───────────────────────────────────────────────
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/449525596304/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'iexcelo-deployer@iexcelo.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.SERVICE }}:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.SERVICE }}:latest \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push --all-tags \
+            ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.SERVICE }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO }}/${{ env.SERVICE }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=3000 \
+            --min-instances=0 \
+            --max-instances=3 \
+            --concurrency=80 \
+            --cpu=1 \
+            --memory=512Mi \
+            --timeout=60 \
+            --set-env-vars="NODE_ENV=production,PORT=3000,DATABASE_PORT=5432,SMTP_HOST=smtp-relay.brevo.com,SMTP_PORT=587,SMTP_FROM_NAME=iExcelo" \
+            --set-secrets="JWT_SECRET=iexcelo-jwt-secret:latest,SMTP_USER=iexcelo-smtp-user:latest,R2_BUCKET_NAME=iexcelo-r2-bucket-name:latest,SMTP_FROM=iexcelo-smtp-from:latest,DATABASE_USER=iexcelo-db-user:latest,DATABASE_NAME=iexcelo-db-name:latest,DATABASE_HOST=iexcelo-db-host:latest,DATABASE_PASSWORD=iexcelo-db-password:latest,SMTP_PASS=iexcelo-smtp-pass:latest,PAYSTACK_SECRET_KEY=iexcelo-paystack-secret:latest,CLOUDFLARE_ACCOUNT_ID=iexcelo-cf-account-id:latest,R2_ACCESS_KEY_ID=iexcelo-r2-access-key-id:latest,R2_SECRET_ACCESS_KEY=iexcelo-r2-secret-access-key:latest,R2_PUBLIC_URL=iexcelo-r2-public-url:latest,VAPID_PUBLIC_KEY=iexcelo-vapid-public-key:latest,VAPID_PRIVATE_KEY=iexcelo-vapid-private-key:latest,REDIS_HOST=iexcelo-redis-host:latest,REDIS_PASSWORD=iexcelo-redis-password:latest,FRONTEND_URL=iexcelo-frontend-url:latest,GOOGLE_CLIENT_ID=iexcelo-google-client-id:latest,GOOGLE_CLIENT_SECRET=iexcelo-google-client-secret:latest,GOOGLE_CALLBACK_URL=iexcelo-google-callback-url:latest"

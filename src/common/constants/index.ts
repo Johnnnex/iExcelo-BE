@@ -13,4 +13,4 @@ export const ALLOWED_IMAGE_MIMETYPES = [
   'image/svg+xml',
 ];
 
-export const MAX_IMAGE_UPLOAD_SIZE = 5 * 1024 * 1024; // 5 MB
+export const MAX_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
