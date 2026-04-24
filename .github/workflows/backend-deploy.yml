@@ -89,8 +89,8 @@ jobs:
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --port=3000 \  
-            --command="node" \ 
+            --port=3000 \
+            --command="node" \
             --args="dist/src/main" \
             --min-instances=0 \
             --max-instances=3 \
