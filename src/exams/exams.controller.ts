@@ -161,7 +161,11 @@ export class ExamsController {
   ) {
     const ids = subjectIds ? subjectIds.split(',').filter(Boolean) : undefined;
     const l = limit ? parseInt(limit, 10) : undefined;
-    const topics = await this.examsService.getTopicsByExamType(examTypeId, ids, l);
+    const topics = await this.examsService.getTopicsByExamType(
+      examTypeId,
+      ids,
+      l,
+    );
     return { message: 'Topics retrieved', data: topics };
   }
 

@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
@@ -124,7 +127,7 @@ export class AnalyticsService {
       where: {
         studentId,
         examTypeId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         date: Between(queryStart, queryEnd) as any,
       },
       relations: ['subject'],
@@ -660,7 +663,7 @@ export class AnalyticsService {
       where: {
         studentId,
         examTypeId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         date: Between(queryStart, queryEnd) as any,
       },
       order: { date: 'ASC' },
@@ -878,11 +881,10 @@ export class AnalyticsService {
       .catch(() => []);
 
     return rows.map((r) => ({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       subjectId: r.subjectId,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
       subjectName: r.subjectName,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+
       questionsAttempted: parseInt(r.questionsAttempted, 10),
     }));
   }

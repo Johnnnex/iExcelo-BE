@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
@@ -49,7 +50,9 @@ export class WebhooksController {
     try {
       event = this.webhookService.verifyStripeSignature(payload, signature);
     } catch (err) {
-      this.logger.error(`Invalid Stripe webhook signature: ${err.message}`);
+      this.logger.error(
+        `Invalid Stripe webhook signature: ${(err as { message: string })?.message}`,
+      );
       throw new BadRequestException('Invalid Stripe signature');
     }
 
@@ -128,7 +131,7 @@ export class WebhooksController {
     } catch (error) {
       await this.webhookService.markEventProcessed(
         webhookEvent.id,
-        error.message,
+        (error as { message: string }).message,
       );
       throw error;
     }
@@ -296,7 +299,7 @@ export class WebhooksController {
     } catch (error) {
       await this.webhookService.markEventProcessed(
         webhookEvent.id,
-        error.message,
+        (error as { message: string }).message,
       );
       throw error;
     }

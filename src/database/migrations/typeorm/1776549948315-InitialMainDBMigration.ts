@@ -1,420 +1,1081 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class InitialMainDBMigration1776549948315 implements MigrationInterface {
-    name = 'InitialMainDBMigration1776549948315'
+  name = 'InitialMainDBMigration1776549948315';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE TABLE "migration_history" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "ranAt" TIMESTAMP NOT NULL, "durationMs" integer, CONSTRAINT "UQ_ace3683e3c6cee3dd06e27b1662" UNIQUE ("name"), CONSTRAINT "PK_63ad381728693434caed4dd922e" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "countries" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "code" character varying NOT NULL, "codeLabel" character varying NOT NULL, "isoCode" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "UQ_fa1376321185575cf2226b1491d" UNIQUE ("name"), CONSTRAINT "UQ_dfcc02f3af5189a35e56e3363db" UNIQUE ("isoCode"), CONSTRAINT "PK_b2d7006793e8697ab3ae2deff18" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "refresh_tokens" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "token" text NOT NULL, "userId" uuid NOT NULL, "expiresAt" TIMESTAMP NOT NULL, "revoked" boolean NOT NULL DEFAULT false, "userAgent" character varying, "ipAddress" character varying, "familyId" character varying, CONSTRAINT "PK_7d8bee0204106019488c4c50ffa" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_610102b60fea1455310ccd299d" ON "refresh_tokens" ("userId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_4542dd2f38a61354a040ba9fd5" ON "refresh_tokens" ("token") `);
-        await queryRunner.query(`CREATE TABLE "subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "description" text, "totalQuestions" integer NOT NULL DEFAULT '0', "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_1a023685ac2b051b4e557b0b280" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "exam_type_subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeId" uuid NOT NULL, "subjectId" uuid NOT NULL, CONSTRAINT "PK_82a545b23c3551c887f10b6f0ce" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_cfadd3f990aa88cc96162ec4d2" ON "exam_type_subjects" ("examTypeId", "subjectId") `);
-        await queryRunner.query(`CREATE TYPE "public"."exam_configs_mode_enum" AS ENUM('mock', 'timed', 'revision')`);
-        await queryRunner.query(`CREATE TABLE "exam_configs" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeId" uuid NOT NULL, "mode" "public"."exam_configs_mode_enum" NOT NULL, "standardDurationMinutes" integer, "standardQuestionCount" integer, "rules" json, CONSTRAINT "PK_99c7149ec7e63b62b99cf368372" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."sponsorships_status_enum" AS ENUM('active', 'expired', 'cancelled')`);
-        await queryRunner.query(`CREATE TABLE "sponsorships" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "studentId" uuid NOT NULL, "subscriptionId" uuid NOT NULL, "status" "public"."sponsorships_status_enum" NOT NULL DEFAULT 'active', "startDate" TIMESTAMP NOT NULL, "endDate" TIMESTAMP NOT NULL, "amountPaid" double precision NOT NULL DEFAULT '0', "planId" character varying, CONSTRAINT "PK_393571b62d6dd0f63c6d3eb154b" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."donations_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`);
-        await queryRunner.query(`CREATE TYPE "public"."donations_type_enum" AS ENUM('exam_subscription', 'educational_items', 'general')`);
-        await queryRunner.query(`CREATE TABLE "donations" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "amount" double precision NOT NULL, "currency" "public"."donations_currency_enum" NOT NULL DEFAULT 'NGN', "type" "public"."donations_type_enum" NOT NULL DEFAULT 'general', "description" text, CONSTRAINT "PK_c01355d6f6f50fc6d1b4a946abf" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "sponsor_urls" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "label" character varying NOT NULL, "code" character varying NOT NULL, "maxUses" integer, "usedCount" integer NOT NULL DEFAULT '0', "isDisabled" boolean NOT NULL DEFAULT false, CONSTRAINT "UQ_370519f9fcee6e38d77038c1b30" UNIQUE ("code"), CONSTRAINT "PK_29965963e638b83cb016c715712" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_a35f76693f9e1751dc442720a8" ON "sponsor_urls" ("sponsorId") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_370519f9fcee6e38d77038c1b3" ON "sponsor_urls" ("code") `);
-        await queryRunner.query(`CREATE TYPE "public"."sponsor_student_invites_status_enum" AS ENUM('pending', 'accepted', 'expired')`);
-        await queryRunner.query(`CREATE TABLE "sponsor_student_invites" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "studentEmail" character varying NOT NULL, "examTypeId" character varying, "token" character varying NOT NULL, "status" "public"."sponsor_student_invites_status_enum" NOT NULL DEFAULT 'pending', "expiresAt" TIMESTAMP NOT NULL, "acceptedAt" TIMESTAMP, CONSTRAINT "PK_e600fa33c0ab7801b811957aa37" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_eac4f77573ba490f1ecf4a0cf5" ON "sponsor_student_invites" ("studentEmail") `);
-        await queryRunner.query(`CREATE INDEX "IDX_73a50ba6c8afc656922fe31c9b" ON "sponsor_student_invites" ("sponsorId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_4225924d7de67849f5d8c980bc" ON "sponsor_student_invites" ("token") `);
-        await queryRunner.query(`CREATE TYPE "public"."givebacks_type_enum" AS ENUM('subscription')`);
-        await queryRunner.query(`CREATE TYPE "public"."givebacks_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`);
-        await queryRunner.query(`CREATE TYPE "public"."givebacks_status_enum" AS ENUM('pending', 'active', 'expired', 'failed')`);
-        await queryRunner.query(`CREATE TABLE "givebacks" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "type" "public"."givebacks_type_enum" NOT NULL, "amount" double precision NOT NULL DEFAULT '0', "currency" "public"."givebacks_currency_enum" NOT NULL DEFAULT 'NGN', "studentCount" integer NOT NULL DEFAULT '0', "bookCount" integer, "status" "public"."givebacks_status_enum" NOT NULL DEFAULT 'pending', "endDate" TIMESTAMP, "hasResubbed" boolean NOT NULL DEFAULT false, "parentGivebackId" character varying, CONSTRAINT "PK_f957812f5174751f4ca1f9a6ca0" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_5d3646ce5aea43ec525cf6f626" ON "givebacks" ("sponsorId", "status", "endDate") `);
-        await queryRunner.query(`CREATE INDEX "IDX_8d08f5e24a828005eea2dbe590" ON "givebacks" ("sponsorId") `);
-        await queryRunner.query(`CREATE TYPE "public"."sponsor_profiles_sponsortype_enum" AS ENUM('individual', 'company', 'religious', 'government')`);
-        await queryRunner.query(`CREATE TABLE "sponsor_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "sponsorType" "public"."sponsor_profiles_sponsortype_enum" NOT NULL DEFAULT 'individual', "companyName" character varying, "totalStudentsSponsored" integer NOT NULL DEFAULT '0', "totalAmountDonated" double precision NOT NULL DEFAULT '0', CONSTRAINT "REL_4a88c1e9189bc4559f85363a21" UNIQUE ("userId"), CONSTRAINT "PK_9b2e91696550b43a5ca438a5713" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."plan_prices_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`);
-        await queryRunner.query(`CREATE TABLE "plan_prices" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "planId" uuid NOT NULL, "currency" "public"."plan_prices_currency_enum" NOT NULL, "amount" double precision NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "stripePriceId" character varying, "paystackPlanCode" character varying, CONSTRAINT "PK_69b05dce9891d42a3d0fc77eec1" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_9364fb2cc2379230cd250b2bd3" ON "plan_prices" ("isActive") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_216079c4298f848a15e49bd94b" ON "plan_prices" ("planId", "currency") `);
-        await queryRunner.query(`CREATE TABLE "subscription_plans" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeId" uuid NOT NULL, "name" character varying NOT NULL, "description" text, "durationDays" integer NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "sortOrder" integer NOT NULL DEFAULT '0', "stripeProductId" character varying, CONSTRAINT "PK_9ab8fe6918451ab3d0a4fb6bb0c" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_561041009b4c715efc7ab7e2ec" ON "subscription_plans" ("examTypeId", "isActive") `);
-        await queryRunner.query(`CREATE TABLE "student_exam_types" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "subscriptionId" uuid, "isDemoAllowed" boolean NOT NULL DEFAULT false, "isPaid" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_0a37da2c21ba9425a381e3305de" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."transactions_type_enum" AS ENUM('subscription_purchase', 'subscription_renewal', 'sponsorship', 'refund')`);
-        await queryRunner.query(`CREATE TYPE "public"."transactions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`);
-        await queryRunner.query(`CREATE TYPE "public"."transactions_provider_enum" AS ENUM('stripe', 'paystack')`);
-        await queryRunner.query(`CREATE TYPE "public"."transactions_status_enum" AS ENUM('pending', 'processing', 'succeeded', 'failed', 'cancelled', 'refunded')`);
-        await queryRunner.query(`CREATE TABLE "transactions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "sponsorId" uuid, "studentExamTypeId" uuid, "subscriptionId" uuid, "type" "public"."transactions_type_enum" NOT NULL DEFAULT 'subscription_purchase', "amount" double precision NOT NULL, "currency" "public"."transactions_currency_enum" NOT NULL DEFAULT 'NGN', "region" character varying, "provider" "public"."transactions_provider_enum" NOT NULL, "status" "public"."transactions_status_enum" NOT NULL DEFAULT 'pending', "providerTransactionId" character varying, "providerCustomerId" character varying, "providerResponse" jsonb, "failureReason" text, "paidAt" TIMESTAMP, "expiresAt" TIMESTAMP, CONSTRAINT "PK_a219afd8dd77ed80f5a862f1db9" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_91e31a934485712dd3e06c135b" ON "transactions" ("providerTransactionId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_2c938f18f0fea39b8fc971f03a" ON "transactions" ("studentExamTypeId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_68b3182f3f5d4d5a0f41c12139" ON "transactions" ("subscriptionId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_a5d9d595b71f889104a0e10316" ON "transactions" ("sponsorId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_a37b6cb6943f9c6b11dbfe168a" ON "transactions" ("studentId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_740a8adb463a50926709f20a4b" ON "transactions" ("studentId", "createdAt") `);
-        await queryRunner.query(`CREATE TYPE "public"."subscriptions_status_enum" AS ENUM('pending', 'scheduled', 'active', 'expired', 'cancelled', 'past_due', 'suspended')`);
-        await queryRunner.query(`CREATE TYPE "public"."subscriptions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`);
-        await queryRunner.query(`CREATE TYPE "public"."subscriptions_paymentprovider_enum" AS ENUM('stripe', 'paystack')`);
-        await queryRunner.query(`CREATE TABLE "subscriptions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "planId" uuid NOT NULL, "planPriceId" uuid, "sponsorId" uuid, "studentExamTypeId" character varying, "startDate" TIMESTAMP, "endDate" TIMESTAMP, "status" "public"."subscriptions_status_enum" NOT NULL DEFAULT 'pending', "amountPaid" double precision NOT NULL DEFAULT '0', "currency" "public"."subscriptions_currency_enum" NOT NULL DEFAULT 'NGN', "paymentProvider" "public"."subscriptions_paymentprovider_enum" NOT NULL, "providerSubscriptionId" character varying, "providerCustomerId" character varying, "autoRenew" boolean NOT NULL DEFAULT false, "lastPaymentStatus" character varying, "cancelledAt" TIMESTAMP, "givebackId" character varying, CONSTRAINT "PK_a87248d73155605cf782be9ee5e" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_2eeb6283285e7ffc0afed6606a" ON "subscriptions" ("providerSubscriptionId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_4badeb2e2fbc3b527a60aea8e0" ON "subscriptions" ("endDate") `);
-        await queryRunner.query(`CREATE INDEX "IDX_6ccf973355b70645eff37774de" ON "subscriptions" ("status") `);
-        await queryRunner.query(`CREATE INDEX "IDX_d506aa039b006b68031e0961ad" ON "subscriptions" ("studentId", "examTypeId") `);
-        await queryRunner.query(`CREATE TYPE "public"."webhook_events_provider_enum" AS ENUM('stripe', 'paystack')`);
-        await queryRunner.query(`CREATE TYPE "public"."webhook_events_eventtype_enum" AS ENUM('payment.succeeded', 'payment.failed', 'subscription.created', 'subscription.updated', 'subscription.renewed', 'subscription.cancelled', 'subscription.expired', 'invoice.created', 'invoice.payment_failed', 'refund.processed')`);
-        await queryRunner.query(`CREATE TABLE "webhook_events" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "provider" "public"."webhook_events_provider_enum" NOT NULL, "providerEventId" character varying NOT NULL, "eventType" "public"."webhook_events_eventtype_enum" NOT NULL, "payload" jsonb NOT NULL, "processedAt" TIMESTAMP, "isProcessed" boolean NOT NULL DEFAULT false, "processingError" text, "retryCount" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_4cba37e6a0acb5e1fc49c34ebfd" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_7b5b3ab6292671f4248bd2e0f7" ON "webhook_events" ("isProcessed") `);
-        await queryRunner.query(`CREATE INDEX "IDX_d33f799688d1bd44cf64b8f80f" ON "webhook_events" ("processedAt") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_f9824a75e1373c0a43c0d8d17c" ON "webhook_events" ("provider", "providerEventId") `);
-        await queryRunner.query(`CREATE TYPE "public"."region_currencies_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`);
-        await queryRunner.query(`CREATE TYPE "public"."region_currencies_paymentprovider_enum" AS ENUM('stripe', 'paystack')`);
-        await queryRunner.query(`CREATE TABLE "region_currencies" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "regionCode" character varying NOT NULL, "regionName" character varying NOT NULL, "currency" "public"."region_currencies_currency_enum" NOT NULL DEFAULT 'USD', "paymentProvider" "public"."region_currencies_paymentprovider_enum" NOT NULL DEFAULT 'stripe', "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "UQ_4fe163aa8c4cba2137739ad6303" UNIQUE ("regionCode"), CONSTRAINT "PK_e14d0b0063b643f89b096982304" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_eb430a390b1e94d5757d255875" ON "region_currencies" ("isActive") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_4fe163aa8c4cba2137739ad630" ON "region_currencies" ("regionCode") `);
-        await queryRunner.query(`CREATE TABLE "exam_types" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "description" text, "minSubjectsSelectable" integer NOT NULL, "maxSubjectsSelectable" integer NOT NULL, "freeTierQuestionLimit" integer NOT NULL DEFAULT '50', "supportedCategories" json NOT NULL DEFAULT '["objectives"]', "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "UQ_d061a7cd341fb259ba6420ec607" UNIQUE ("name"), CONSTRAINT "PK_aa2897f3176ef22cc87e38224cb" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."exam_attempts_mode_enum" AS ENUM('revision', 'timed', 'mock')`);
-        await queryRunner.query(`CREATE TYPE "public"."exam_attempts_status_enum" AS ENUM('in_progress', 'completed', 'auto_submitted')`);
-        await queryRunner.query(`CREATE TABLE "exam_attempts" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "mode" "public"."exam_attempts_mode_enum" NOT NULL, "selectedSubjects" json NOT NULL, "totalQuestions" integer NOT NULL, "correctAnswers" integer NOT NULL DEFAULT '0', "wrongAnswers" integer NOT NULL DEFAULT '0', "unanswered" integer NOT NULL DEFAULT '0', "scorePercentage" double precision NOT NULL DEFAULT '0', "totalMarksObtained" double precision NOT NULL DEFAULT '0', "totalMarksPossible" double precision NOT NULL DEFAULT '0', "questionResponses" json NOT NULL, "timeSpentSeconds" integer NOT NULL DEFAULT '0', "timeLimitSeconds" integer, "status" "public"."exam_attempts_status_enum" NOT NULL DEFAULT 'in_progress', "startedAt" TIMESTAMP NOT NULL, "completedAt" TIMESTAMP, "questionIds" json, "draftResponses" json, CONSTRAINT "PK_4eb6c7775e0a9c178ef7f4826f9" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "student_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "defaultExamTypeId" uuid, "lastExamTypeId" character varying, "totalQuestionsSolved" integer NOT NULL DEFAULT '0', "totalCorrect" integer NOT NULL DEFAULT '0', "totalWrong" integer NOT NULL DEFAULT '0', "overallAccuracy" double precision NOT NULL DEFAULT '0', "hasEverSubscribed" boolean NOT NULL DEFAULT false, "isSponsored" boolean NOT NULL DEFAULT false, "sponsorId" character varying, "sponsorUrlId" character varying, "sponsorDisplayName" character varying, CONSTRAINT "REL_064d129936a1e821d637ee8c88" UNIQUE ("userId"), CONSTRAINT "PK_5ed0a32eeaddfe812fb326177d0" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_26aa2ff3c3d94673d8870bf767" ON "student_profiles" ("sponsorId") `);
-        await queryRunner.query(`CREATE TYPE "public"."affiliate_referrals_usertype_enum" AS ENUM('student', 'sponsor')`);
-        await queryRunner.query(`CREATE TABLE "affiliate_referrals" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "referredUserId" uuid NOT NULL, "userType" "public"."affiliate_referrals_usertype_enum" NOT NULL, "commissionPaid" boolean NOT NULL DEFAULT false, "hasSubscribed" boolean NOT NULL DEFAULT false, "subscribedAt" TIMESTAMP, "totalRevenueGenerated" double precision NOT NULL DEFAULT '0', CONSTRAINT "REL_c5a12ed95da261311593d0d06f" UNIQUE ("referredUserId"), CONSTRAINT "PK_edd63337ee288c94db0a6b6772c" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."commissions_status_enum" AS ENUM('pending', 'paid')`);
-        await queryRunner.query(`CREATE TYPE "public"."commissions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`);
-        await queryRunner.query(`CREATE TABLE "commissions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "referralId" uuid NOT NULL, "amount" double precision NOT NULL, "status" "public"."commissions_status_enum" NOT NULL DEFAULT 'pending', "paidAt" TIMESTAMP, "subscriptionId" uuid, "subscriptionAmount" double precision, "currency" "public"."commissions_currency_enum", "planName" character varying, CONSTRAINT "PK_2701379966e2e670bb5ff0ae78e" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "affiliate_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "affiliateCode" character varying NOT NULL, "totalReferrals" integer NOT NULL DEFAULT '0', "totalEarnings" double precision NOT NULL DEFAULT '0', "pendingBalance" double precision NOT NULL DEFAULT '0', "totalConversions" integer NOT NULL DEFAULT '0', "totalPaidOut" double precision NOT NULL DEFAULT '0', CONSTRAINT "UQ_e178542c24715cd70b1f5f03b36" UNIQUE ("affiliateCode"), CONSTRAINT "REL_83755235707b72b56985c1f986" UNIQUE ("userId"), CONSTRAINT "PK_280950d636741f65f3f98968923" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TYPE "public"."users_role_enum" AS ENUM('student', 'sponsor', 'affiliate', 'admin')`);
-        await queryRunner.query(`CREATE TYPE "public"."users_provider_enum" AS ENUM('local', 'google', 'dual')`);
-        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "email" character varying NOT NULL, "password" character varying, "firstName" character varying NOT NULL, "lastName" character varying NOT NULL, "phoneNumber" character varying, "countryCode" character varying, "picture" character varying, "role" "public"."users_role_enum", "provider" "public"."users_provider_enum" NOT NULL DEFAULT 'local', "googleId" character varying, "emailVerified" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "lastLogin" TIMESTAMP, CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "student_exam_type_subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentExamTypeId" uuid NOT NULL, "subjectId" uuid NOT NULL, CONSTRAINT "PK_f93e880d7cd08828cd179cddd5e" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_c9529597f1e0426f11b01c2aed" ON "student_exam_type_subjects" ("studentExamTypeId", "subjectId") `);
-        await queryRunner.query(`CREATE TABLE "passages" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeSubjectId" uuid NOT NULL, "title" text NOT NULL, "content" text NOT NULL, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_5f625d72252d22b1826b4ac79cf" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "topics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "subjectId" uuid NOT NULL, "name" character varying NOT NULL, "content" text, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_e4aa99a3fa60ec3a37d1fc4e853" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_1e5f6d28b7a1d488e92861f1ee" ON "topics" ("subjectId", "name") `);
-        await queryRunner.query(`CREATE INDEX "IDX_38b54068d2482668ba8f81a59a" ON "topics" ("subjectId") `);
-        await queryRunner.query(`CREATE TYPE "public"."questions_type_enum" AS ENUM('multiple_choice', 'essay', 'true_false', 'fill_in_the_blank', 'matching', 'multiple_response', 'short_answer')`);
-        await queryRunner.query(`CREATE TYPE "public"."questions_category_enum" AS ENUM('objectives', 'theory', 'practical')`);
-        await queryRunner.query(`CREATE TYPE "public"."questions_difficulty_enum" AS ENUM('easy', 'medium', 'hard')`);
-        await queryRunner.query(`CREATE TABLE "questions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeSubjectId" uuid NOT NULL, "passageId" uuid, "questionText" text NOT NULL, "options" json, "type" "public"."questions_type_enum" NOT NULL, "correctAnswer" json, "topicId" uuid, "explanationShort" text, "explanationLong" text, "validationConfig" json, "category" "public"."questions_category_enum" NOT NULL DEFAULT 'objectives', "difficulty" "public"."questions_difficulty_enum" NOT NULL DEFAULT 'medium', "marks" double precision NOT NULL DEFAULT '1', "isActive" boolean NOT NULL DEFAULT true, "timesAttempted" integer NOT NULL DEFAULT '0', "timesCorrect" integer NOT NULL DEFAULT '0', "legacyId" character varying, CONSTRAINT "UQ_afbe58b8f43ba71147c5f7bb1a7" UNIQUE ("legacyId"), CONSTRAINT "PK_08a6d4b0f49ff300bf3a0ca60ac" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "question_progress" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "questionId" uuid NOT NULL, "isDone" boolean NOT NULL DEFAULT false, "timesAttempted" integer NOT NULL DEFAULT '0', "timesCorrect" integer NOT NULL DEFAULT '0', "timesWrong" integer NOT NULL DEFAULT '0', "lastAttempted" TIMESTAMP, CONSTRAINT "PK_4b2729de0fb92f5960ac1ca4762" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_b701e1866e3f3ede56b4ba8a1c" ON "question_progress" ("studentId", "questionId") `);
-        await queryRunner.query(`CREATE TYPE "public"."flagged_questions_flagtype_enum" AS ENUM('difficult', 'error', 'report')`);
-        await queryRunner.query(`CREATE TABLE "flagged_questions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "questionId" uuid NOT NULL, "reason" text, "flagType" "public"."flagged_questions_flagtype_enum" NOT NULL DEFAULT 'error', "adminReviewed" boolean NOT NULL DEFAULT false, "flaggedAt" TIMESTAMP NOT NULL, CONSTRAINT "PK_e1aaae07978d0aecda4fa07a782" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "push_subscriptions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "endpoint" character varying NOT NULL, "p256dh" character varying NOT NULL, "auth" character varying NOT NULL, "userAgent" character varying, CONSTRAINT "UQ_0008bdfd174e533a3f98bf9af16" UNIQUE ("endpoint"), CONSTRAINT "PK_757fc8f00c34f66832668dc2e53" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_4cc061875e9eecc311a94b3e43" ON "push_subscriptions" ("userId") `);
-        await queryRunner.query(`CREATE TYPE "public"."notifications_type_enum" AS ENUM('new_message', 'new_chatroom', 'giveback_activated', 'subscription_expiring', 'subscription_expired', 'exam_result', 'flagged_message_reviewed')`);
-        await queryRunner.query(`CREATE TABLE "notifications" ("id" uuid NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "recipientId" character varying NOT NULL, "type" "public"."notifications_type_enum" NOT NULL, "title" character varying NOT NULL, "body" text NOT NULL, "url" character varying NOT NULL, "isRead" boolean NOT NULL DEFAULT false, "readAt" TIMESTAMP WITH TIME ZONE, "metadata" jsonb, CONSTRAINT "PK_6a72c3c0f683f6462415e653c3a" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_ba953fe98c085411bba8535299" ON "notifications" ("recipientId", "isRead", "createdAt") `);
-        await queryRunner.query(`CREATE TYPE "public"."activity_logs_action_enum" AS ENUM('login', 'signup', 'exam_start', 'exam_submit', 'payment', 'error', 'system', 'other', 'create', 'read', 'update', 'delete')`);
-        await queryRunner.query(`CREATE TYPE "public"."activity_logs_severity_enum" AS ENUM('info', 'warning', 'error', 'critical')`);
-        await queryRunner.query(`CREATE TABLE "activity_logs" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid, "action" "public"."activity_logs_action_enum" NOT NULL, "description" text NOT NULL, "metadata" json, "severity" "public"."activity_logs_severity_enum" NOT NULL DEFAULT 'info', CONSTRAINT "PK_f25287b6140c5ba18d38776a796" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "user_presence" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "isOnline" boolean NOT NULL DEFAULT false, "lastSeenAt" TIMESTAMP, CONSTRAINT "UQ_b06e00b58bf86a3772b1251ac02" UNIQUE ("userId"), CONSTRAINT "REL_b06e00b58bf86a3772b1251ac0" UNIQUE ("userId"), CONSTRAINT "PK_562d693ca2ee27d96b75ff78eda" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "chatroom_participants" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "chatroomId" uuid NOT NULL, "userId" uuid NOT NULL, "lastReadAt" TIMESTAMP WITH TIME ZONE, CONSTRAINT "UQ_47e73457924c40837b30445600e" UNIQUE ("chatroomId", "userId"), CONSTRAINT "PK_966669efaeec6de6b72e9752312" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_1b117714877b45d9dafe069b76" ON "chatroom_participants" ("userId") `);
-        await queryRunner.query(`CREATE TYPE "public"."chat_messages_deliverystatus_enum" AS ENUM('sent', 'read')`);
-        await queryRunner.query(`CREATE TABLE "chat_messages" ("id" uuid NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "chatroomId" uuid NOT NULL, "senderId" uuid NOT NULL, "content" text NOT NULL, "deliveryStatus" "public"."chat_messages_deliverystatus_enum" NOT NULL DEFAULT 'sent', "deletedAt" TIMESTAMP, "isFlagged" boolean NOT NULL DEFAULT false, "flagReason" text, CONSTRAINT "PK_40c55ee0e571e268b0d3cd37d10" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_edbdfa54b1fd594945e43ca30f" ON "chat_messages" ("chatroomId", "createdAt") `);
-        await queryRunner.query(`CREATE TYPE "public"."chatrooms_type_enum" AS ENUM('sponsor_student', 'student_student')`);
-        await queryRunner.query(`CREATE TABLE "chatrooms" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "type" "public"."chatrooms_type_enum" NOT NULL DEFAULT 'sponsor_student', CONSTRAINT "PK_d190d6f785fb99dffb138cd0443" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_54b94971ac7cc6af25721f8357" ON "chatrooms" ("createdAt") `);
-        await queryRunner.query(`CREATE TYPE "public"."message_flags_status_enum" AS ENUM('pending', 'reviewed', 'dismissed')`);
-        await queryRunner.query(`CREATE TABLE "message_flags" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "messageId" uuid NOT NULL, "chatroomId" uuid NOT NULL, "reportedByUserId" uuid NOT NULL, "reason" text, "status" "public"."message_flags_status_enum" NOT NULL DEFAULT 'pending', "adminNotes" text, "reviewedByAdminId" character varying, "reviewedAt" TIMESTAMP, CONSTRAINT "PK_a5b3b8f05e0e5a58914dae6b178" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_8bf526a106ddc82800e9bc59f7" ON "message_flags" ("status") `);
-        await queryRunner.query(`CREATE TABLE "password_reset_tokens" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "token" text NOT NULL, "userId" uuid NOT NULL, "expiresAt" TIMESTAMP NOT NULL, "used" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_d16bebd73e844c48bca50ff8d3d" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_d6a19d4b4f6c62dcd29daa497e" ON "password_reset_tokens" ("userId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_ab673f0e63eac966762155508e" ON "password_reset_tokens" ("token") `);
-        await queryRunner.query(`CREATE TABLE "onboarding_tokens" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "token" character varying NOT NULL, "isUsed" boolean NOT NULL DEFAULT false, "usedAt" TIMESTAMP, CONSTRAINT "UQ_8f8b5f36d2ffe14ec26d68824e8" UNIQUE ("token"), CONSTRAINT "PK_0d4f9cc4392b0553096d84f461a" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "email_verification_codes" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "code" text NOT NULL, "userId" uuid NOT NULL, "expiresAt" TIMESTAMP NOT NULL, "used" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_5bb1cbeebcbcb38996911bff8d4" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_97bef998b0d463cb053643822a" ON "email_verification_codes" ("userId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_4d6d04ed4d25fab71f214490af" ON "email_verification_codes" ("code") `);
-        await queryRunner.query(`CREATE TABLE "student_subject_analytics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "subjectId" uuid NOT NULL, "date" date NOT NULL, "questionsAttempted" integer NOT NULL DEFAULT '0', "questionsCorrect" integer NOT NULL DEFAULT '0', "questionsWrong" integer NOT NULL DEFAULT '0', "accuracyPercentage" double precision NOT NULL DEFAULT '0', "averageScore" double precision NOT NULL DEFAULT '0', "essayQuestionsAttempted" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_df0ccea5a3bef86fe9fc8ad2460" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_614956a91d200887713256de63" ON "student_subject_analytics" ("studentId", "examTypeId", "subjectId", "date") `);
-        await queryRunner.query(`CREATE TABLE "student_streaks" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "currentStreak" integer NOT NULL DEFAULT '0', "longestStreak" integer NOT NULL DEFAULT '0', "lastActivityDate" date, CONSTRAINT "UQ_07999ab7ee43f29a26463b4a655" UNIQUE ("studentId"), CONSTRAINT "REL_07999ab7ee43f29a26463b4a65" UNIQUE ("studentId"), CONSTRAINT "PK_1713b7ca6705a6904fb54cab5e2" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "student_daily_analytics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "date" date NOT NULL, "questionsAttempted" integer NOT NULL DEFAULT '0', "questionsCorrect" integer NOT NULL DEFAULT '0', "questionsWrong" integer NOT NULL DEFAULT '0', "questionsUnanswered" integer NOT NULL DEFAULT '0', "accuracyPercentage" double precision NOT NULL DEFAULT '0', "examsCompleted" integer NOT NULL DEFAULT '0', "averageScore" double precision NOT NULL DEFAULT '0', "totalTimeSpentSeconds" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_a781be2e9e8d79717a8f1d946fb" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_6dcc898c1abf4bd0e5abb8e229" ON "student_daily_analytics" ("studentId", "examTypeId", "date") `);
-        await queryRunner.query(`CREATE TABLE "platform_daily_analytics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "date" date NOT NULL, "newStudents" integer NOT NULL DEFAULT '0', "newSponsors" integer NOT NULL DEFAULT '0', "newAffiliates" integer NOT NULL DEFAULT '0', "activeStudents" integer NOT NULL DEFAULT '0', "activeSponsors" integer NOT NULL DEFAULT '0', "activeAffiliates" integer NOT NULL DEFAULT '0', "totalRevenue" double precision NOT NULL DEFAULT '0', "totalExpenses" double precision NOT NULL DEFAULT '0', "totalProfit" double precision NOT NULL DEFAULT '0', "newSubscriptions" integer NOT NULL DEFAULT '0', "cancelledSubscriptions" integer NOT NULL DEFAULT '0', "demoUsers" integer NOT NULL DEFAULT '0', "premiumUsers" integer NOT NULL DEFAULT '0', CONSTRAINT "UQ_35e3c6775b915f9b8c96baaf28b" UNIQUE ("date"), CONSTRAINT "PK_3ceb09ff44ba4bba605c81416ac" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_35e3c6775b915f9b8c96baaf28" ON "platform_daily_analytics" ("date") `);
-        await queryRunner.query(`CREATE TABLE "affiliate_daily_analytics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "date" date NOT NULL, "newReferrals" integer NOT NULL DEFAULT '0', "conversions" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_9d3ccc4a139cf9d71cb537159e9" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_ec1b1140bacc6871923daf39fe" ON "affiliate_daily_analytics" ("affiliateId", "date") `);
-        await queryRunner.query(`CREATE TYPE "public"."affiliate_payouts_status_enum" AS ENUM('pending', 'processing', 'completed', 'failed')`);
-        await queryRunner.query(`CREATE TABLE "affiliate_payouts" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "amount" double precision NOT NULL, "status" "public"."affiliate_payouts_status_enum" NOT NULL DEFAULT 'pending', "paymentMethod" character varying, "paymentDetails" json, "processedAt" TIMESTAMP, "failureReason" text, CONSTRAINT "PK_bb16ad268019be269f02c660016" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE INDEX "IDX_196f8ddf419a42dae14b14bc0c" ON "affiliate_payouts" ("affiliateId", "createdAt") `);
-        await queryRunner.query(`ALTER TABLE "refresh_tokens" ADD CONSTRAINT "FK_610102b60fea1455310ccd299de" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "exam_type_subjects" ADD CONSTRAINT "FK_5f29880ca05563c3251dbd803ab" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "exam_type_subjects" ADD CONSTRAINT "FK_9c561cb7cee62e72adc49692d40" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "exam_configs" ADD CONSTRAINT "FK_4c8a1e666329466d98884ba0e84" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "sponsorships" ADD CONSTRAINT "FK_11300c2ba3817ba2c81eba0b8cc" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "sponsorships" ADD CONSTRAINT "FK_821b8a0385a3b6a28c7f84bf6cd" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "sponsorships" ADD CONSTRAINT "FK_9a1dcfb4803db5566f968f2bf72" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "donations" ADD CONSTRAINT "FK_6e2eefb71a05427462881769627" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "sponsor_urls" ADD CONSTRAINT "FK_a35f76693f9e1751dc442720a80" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "sponsor_student_invites" ADD CONSTRAINT "FK_73a50ba6c8afc656922fe31c9b0" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "givebacks" ADD CONSTRAINT "FK_8d08f5e24a828005eea2dbe5902" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "sponsor_profiles" ADD CONSTRAINT "FK_4a88c1e9189bc4559f85363a21a" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "plan_prices" ADD CONSTRAINT "FK_eb2f222f91a8e78e9e1d591b0de" FOREIGN KEY ("planId") REFERENCES "subscription_plans"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "subscription_plans" ADD CONSTRAINT "FK_cafccb3e544becc80d7f2e8ca10" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_exam_types" ADD CONSTRAINT "FK_7475c7eca5638af23ed43dbe2ec" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_exam_types" ADD CONSTRAINT "FK_b7274ed14dd16c7eddd10e1d557" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_exam_types" ADD CONSTRAINT "FK_dce8e01bcfbfb138108782499f9" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "transactions" ADD CONSTRAINT "FK_a37b6cb6943f9c6b11dbfe168a0" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "transactions" ADD CONSTRAINT "FK_2c938f18f0fea39b8fc971f03a9" FOREIGN KEY ("studentExamTypeId") REFERENCES "student_exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "transactions" ADD CONSTRAINT "FK_68b3182f3f5d4d5a0f41c12139b" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "transactions" ADD CONSTRAINT "FK_a5d9d595b71f889104a0e103162" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_f62e9a735f10ce6006ac230fcf9" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_6514ddf48ea7499c62efa6c0a41" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_7536cba909dd7584a4640cad7d5" FOREIGN KEY ("planId") REFERENCES "subscription_plans"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_2bc6920dce9ce914dd46cabe847" FOREIGN KEY ("planPriceId") REFERENCES "plan_prices"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_785d7001d101cf06d1147cea3ae" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "exam_attempts" ADD CONSTRAINT "FK_b3cfd8fad204570a1d448846892" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "exam_attempts" ADD CONSTRAINT "FK_9172b980d49d753322ce4eecc1b" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_profiles" ADD CONSTRAINT "FK_064d129936a1e821d637ee8c88e" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_profiles" ADD CONSTRAINT "FK_d6d200ca910a2124e36eab1177e" FOREIGN KEY ("defaultExamTypeId") REFERENCES "exam_types"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "affiliate_referrals" ADD CONSTRAINT "FK_82d96020b31bc03f7a8b961da6f" FOREIGN KEY ("affiliateId") REFERENCES "affiliate_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "affiliate_referrals" ADD CONSTRAINT "FK_c5a12ed95da261311593d0d06f8" FOREIGN KEY ("referredUserId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "commissions" ADD CONSTRAINT "FK_b8590f437bdcd64573cabe89c15" FOREIGN KEY ("affiliateId") REFERENCES "affiliate_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "commissions" ADD CONSTRAINT "FK_fc9157673a130aada3e4a5ed1b0" FOREIGN KEY ("referralId") REFERENCES "affiliate_referrals"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "commissions" ADD CONSTRAINT "FK_f5b6fb40f80d8d11dc8af536fb0" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "affiliate_profiles" ADD CONSTRAINT "FK_83755235707b72b56985c1f9864" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_exam_type_subjects" ADD CONSTRAINT "FK_70596ba679fd1683e8e0c0c1ce9" FOREIGN KEY ("studentExamTypeId") REFERENCES "student_exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_exam_type_subjects" ADD CONSTRAINT "FK_d61ed4721979e642e9cdd7d5deb" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "passages" ADD CONSTRAINT "FK_9fbfea3e16e05a89274192a57a6" FOREIGN KEY ("examTypeSubjectId") REFERENCES "exam_type_subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "topics" ADD CONSTRAINT "FK_38b54068d2482668ba8f81a59ae" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "questions" ADD CONSTRAINT "FK_e5d76861587b8a6472ec7a26c74" FOREIGN KEY ("topicId") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "questions" ADD CONSTRAINT "FK_e2d2fc7472851dfe305c631c047" FOREIGN KEY ("examTypeSubjectId") REFERENCES "exam_type_subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "questions" ADD CONSTRAINT "FK_9639bdb4fa738fcb27904b8ddac" FOREIGN KEY ("passageId") REFERENCES "passages"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "question_progress" ADD CONSTRAINT "FK_dcbbe06b2bd4c2f26ef9faa0a15" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "question_progress" ADD CONSTRAINT "FK_443b500c79876621023b0b407d4" FOREIGN KEY ("questionId") REFERENCES "questions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "flagged_questions" ADD CONSTRAINT "FK_70019fffbbf0d65bd75e3c64994" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "flagged_questions" ADD CONSTRAINT "FK_4664eace4e8540223cd3012a553" FOREIGN KEY ("questionId") REFERENCES "questions"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "push_subscriptions" ADD CONSTRAINT "FK_4cc061875e9eecc311a94b3e431" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "activity_logs" ADD CONSTRAINT "FK_597e6df96098895bf19d4b5ea45" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "user_presence" ADD CONSTRAINT "FK_b06e00b58bf86a3772b1251ac02" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "chatroom_participants" ADD CONSTRAINT "FK_ce49606b5d6ea554ad7d5072f43" FOREIGN KEY ("chatroomId") REFERENCES "chatrooms"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "chatroom_participants" ADD CONSTRAINT "FK_1b117714877b45d9dafe069b763" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "chat_messages" ADD CONSTRAINT "FK_caaefe3be72bc2776108f664464" FOREIGN KEY ("chatroomId") REFERENCES "chatrooms"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "chat_messages" ADD CONSTRAINT "FK_fc6b58e41e9a871dacbe9077def" FOREIGN KEY ("senderId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "message_flags" ADD CONSTRAINT "FK_ed6725a3c86b7e5e299bf731fb5" FOREIGN KEY ("messageId") REFERENCES "chat_messages"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "message_flags" ADD CONSTRAINT "FK_4e54bfe9b919314d90f3892f117" FOREIGN KEY ("chatroomId") REFERENCES "chatrooms"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "message_flags" ADD CONSTRAINT "FK_9b53c21c267876eda8cba50d5ac" FOREIGN KEY ("reportedByUserId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "FK_d6a19d4b4f6c62dcd29daa497e2" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "onboarding_tokens" ADD CONSTRAINT "FK_9679108bcfe1038d71a4154efcc" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "email_verification_codes" ADD CONSTRAINT "FK_97bef998b0d463cb053643822a3" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_subject_analytics" ADD CONSTRAINT "FK_813dad1bbe4c252b72960d02e31" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_subject_analytics" ADD CONSTRAINT "FK_8e38f168f2a133dec72cab28017" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_subject_analytics" ADD CONSTRAINT "FK_26e0e94dea0b20bef96596bf319" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_streaks" ADD CONSTRAINT "FK_07999ab7ee43f29a26463b4a655" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_daily_analytics" ADD CONSTRAINT "FK_b0ffcbebb33f62b61129b6e9c08" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "student_daily_analytics" ADD CONSTRAINT "FK_1d24f38e7c0cd78e0dbdc6c2c46" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "affiliate_daily_analytics" ADD CONSTRAINT "FK_abe4593804f12cf4c78c86377b2" FOREIGN KEY ("affiliateId") REFERENCES "affiliate_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "affiliate_payouts" ADD CONSTRAINT "FK_c606e40904640ea34c1b025beb5" FOREIGN KEY ("affiliateId") REFERENCES "affiliate_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-    }
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `CREATE TABLE "migration_history" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "ranAt" TIMESTAMP NOT NULL, "durationMs" integer, CONSTRAINT "UQ_ace3683e3c6cee3dd06e27b1662" UNIQUE ("name"), CONSTRAINT "PK_63ad381728693434caed4dd922e" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "countries" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "code" character varying NOT NULL, "codeLabel" character varying NOT NULL, "isoCode" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "UQ_fa1376321185575cf2226b1491d" UNIQUE ("name"), CONSTRAINT "UQ_dfcc02f3af5189a35e56e3363db" UNIQUE ("isoCode"), CONSTRAINT "PK_b2d7006793e8697ab3ae2deff18" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "refresh_tokens" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "token" text NOT NULL, "userId" uuid NOT NULL, "expiresAt" TIMESTAMP NOT NULL, "revoked" boolean NOT NULL DEFAULT false, "userAgent" character varying, "ipAddress" character varying, "familyId" character varying, CONSTRAINT "PK_7d8bee0204106019488c4c50ffa" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_610102b60fea1455310ccd299d" ON "refresh_tokens" ("userId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4542dd2f38a61354a040ba9fd5" ON "refresh_tokens" ("token") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "description" text, "totalQuestions" integer NOT NULL DEFAULT '0', "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_1a023685ac2b051b4e557b0b280" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "exam_type_subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeId" uuid NOT NULL, "subjectId" uuid NOT NULL, CONSTRAINT "PK_82a545b23c3551c887f10b6f0ce" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_cfadd3f990aa88cc96162ec4d2" ON "exam_type_subjects" ("examTypeId", "subjectId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."exam_configs_mode_enum" AS ENUM('mock', 'timed', 'revision')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "exam_configs" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeId" uuid NOT NULL, "mode" "public"."exam_configs_mode_enum" NOT NULL, "standardDurationMinutes" integer, "standardQuestionCount" integer, "rules" json, CONSTRAINT "PK_99c7149ec7e63b62b99cf368372" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."sponsorships_status_enum" AS ENUM('active', 'expired', 'cancelled')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "sponsorships" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "studentId" uuid NOT NULL, "subscriptionId" uuid NOT NULL, "status" "public"."sponsorships_status_enum" NOT NULL DEFAULT 'active', "startDate" TIMESTAMP NOT NULL, "endDate" TIMESTAMP NOT NULL, "amountPaid" double precision NOT NULL DEFAULT '0', "planId" character varying, CONSTRAINT "PK_393571b62d6dd0f63c6d3eb154b" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."donations_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."donations_type_enum" AS ENUM('exam_subscription', 'educational_items', 'general')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "donations" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "amount" double precision NOT NULL, "currency" "public"."donations_currency_enum" NOT NULL DEFAULT 'NGN', "type" "public"."donations_type_enum" NOT NULL DEFAULT 'general', "description" text, CONSTRAINT "PK_c01355d6f6f50fc6d1b4a946abf" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "sponsor_urls" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "label" character varying NOT NULL, "code" character varying NOT NULL, "maxUses" integer, "usedCount" integer NOT NULL DEFAULT '0', "isDisabled" boolean NOT NULL DEFAULT false, CONSTRAINT "UQ_370519f9fcee6e38d77038c1b30" UNIQUE ("code"), CONSTRAINT "PK_29965963e638b83cb016c715712" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_a35f76693f9e1751dc442720a8" ON "sponsor_urls" ("sponsorId") `,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_370519f9fcee6e38d77038c1b3" ON "sponsor_urls" ("code") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."sponsor_student_invites_status_enum" AS ENUM('pending', 'accepted', 'expired')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "sponsor_student_invites" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "studentEmail" character varying NOT NULL, "examTypeId" character varying, "token" character varying NOT NULL, "status" "public"."sponsor_student_invites_status_enum" NOT NULL DEFAULT 'pending', "expiresAt" TIMESTAMP NOT NULL, "acceptedAt" TIMESTAMP, CONSTRAINT "PK_e600fa33c0ab7801b811957aa37" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_eac4f77573ba490f1ecf4a0cf5" ON "sponsor_student_invites" ("studentEmail") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_73a50ba6c8afc656922fe31c9b" ON "sponsor_student_invites" ("sponsorId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4225924d7de67849f5d8c980bc" ON "sponsor_student_invites" ("token") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."givebacks_type_enum" AS ENUM('subscription')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."givebacks_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."givebacks_status_enum" AS ENUM('pending', 'active', 'expired', 'failed')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "givebacks" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "type" "public"."givebacks_type_enum" NOT NULL, "amount" double precision NOT NULL DEFAULT '0', "currency" "public"."givebacks_currency_enum" NOT NULL DEFAULT 'NGN', "studentCount" integer NOT NULL DEFAULT '0', "bookCount" integer, "status" "public"."givebacks_status_enum" NOT NULL DEFAULT 'pending', "endDate" TIMESTAMP, "hasResubbed" boolean NOT NULL DEFAULT false, "parentGivebackId" character varying, CONSTRAINT "PK_f957812f5174751f4ca1f9a6ca0" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_5d3646ce5aea43ec525cf6f626" ON "givebacks" ("sponsorId", "status", "endDate") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_8d08f5e24a828005eea2dbe590" ON "givebacks" ("sponsorId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."sponsor_profiles_sponsortype_enum" AS ENUM('individual', 'company', 'religious', 'government')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "sponsor_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "sponsorType" "public"."sponsor_profiles_sponsortype_enum" NOT NULL DEFAULT 'individual', "companyName" character varying, "totalStudentsSponsored" integer NOT NULL DEFAULT '0', "totalAmountDonated" double precision NOT NULL DEFAULT '0', CONSTRAINT "REL_4a88c1e9189bc4559f85363a21" UNIQUE ("userId"), CONSTRAINT "PK_9b2e91696550b43a5ca438a5713" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."plan_prices_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "plan_prices" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "planId" uuid NOT NULL, "currency" "public"."plan_prices_currency_enum" NOT NULL, "amount" double precision NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "stripePriceId" character varying, "paystackPlanCode" character varying, CONSTRAINT "PK_69b05dce9891d42a3d0fc77eec1" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_9364fb2cc2379230cd250b2bd3" ON "plan_prices" ("isActive") `,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_216079c4298f848a15e49bd94b" ON "plan_prices" ("planId", "currency") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "subscription_plans" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeId" uuid NOT NULL, "name" character varying NOT NULL, "description" text, "durationDays" integer NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "sortOrder" integer NOT NULL DEFAULT '0', "stripeProductId" character varying, CONSTRAINT "PK_9ab8fe6918451ab3d0a4fb6bb0c" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_561041009b4c715efc7ab7e2ec" ON "subscription_plans" ("examTypeId", "isActive") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "student_exam_types" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "subscriptionId" uuid, "isDemoAllowed" boolean NOT NULL DEFAULT false, "isPaid" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_0a37da2c21ba9425a381e3305de" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."transactions_type_enum" AS ENUM('subscription_purchase', 'subscription_renewal', 'sponsorship', 'refund')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."transactions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."transactions_provider_enum" AS ENUM('stripe', 'paystack')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."transactions_status_enum" AS ENUM('pending', 'processing', 'succeeded', 'failed', 'cancelled', 'refunded')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "transactions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "sponsorId" uuid, "studentExamTypeId" uuid, "subscriptionId" uuid, "type" "public"."transactions_type_enum" NOT NULL DEFAULT 'subscription_purchase', "amount" double precision NOT NULL, "currency" "public"."transactions_currency_enum" NOT NULL DEFAULT 'NGN', "region" character varying, "provider" "public"."transactions_provider_enum" NOT NULL, "status" "public"."transactions_status_enum" NOT NULL DEFAULT 'pending', "providerTransactionId" character varying, "providerCustomerId" character varying, "providerResponse" jsonb, "failureReason" text, "paidAt" TIMESTAMP, "expiresAt" TIMESTAMP, CONSTRAINT "PK_a219afd8dd77ed80f5a862f1db9" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_91e31a934485712dd3e06c135b" ON "transactions" ("providerTransactionId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_2c938f18f0fea39b8fc971f03a" ON "transactions" ("studentExamTypeId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_68b3182f3f5d4d5a0f41c12139" ON "transactions" ("subscriptionId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_a5d9d595b71f889104a0e10316" ON "transactions" ("sponsorId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_a37b6cb6943f9c6b11dbfe168a" ON "transactions" ("studentId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_740a8adb463a50926709f20a4b" ON "transactions" ("studentId", "createdAt") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."subscriptions_status_enum" AS ENUM('pending', 'scheduled', 'active', 'expired', 'cancelled', 'past_due', 'suspended')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."subscriptions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."subscriptions_paymentprovider_enum" AS ENUM('stripe', 'paystack')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "subscriptions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "planId" uuid NOT NULL, "planPriceId" uuid, "sponsorId" uuid, "studentExamTypeId" character varying, "startDate" TIMESTAMP, "endDate" TIMESTAMP, "status" "public"."subscriptions_status_enum" NOT NULL DEFAULT 'pending', "amountPaid" double precision NOT NULL DEFAULT '0', "currency" "public"."subscriptions_currency_enum" NOT NULL DEFAULT 'NGN', "paymentProvider" "public"."subscriptions_paymentprovider_enum" NOT NULL, "providerSubscriptionId" character varying, "providerCustomerId" character varying, "autoRenew" boolean NOT NULL DEFAULT false, "lastPaymentStatus" character varying, "cancelledAt" TIMESTAMP, "givebackId" character varying, CONSTRAINT "PK_a87248d73155605cf782be9ee5e" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_2eeb6283285e7ffc0afed6606a" ON "subscriptions" ("providerSubscriptionId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4badeb2e2fbc3b527a60aea8e0" ON "subscriptions" ("endDate") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_6ccf973355b70645eff37774de" ON "subscriptions" ("status") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_d506aa039b006b68031e0961ad" ON "subscriptions" ("studentId", "examTypeId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."webhook_events_provider_enum" AS ENUM('stripe', 'paystack')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."webhook_events_eventtype_enum" AS ENUM('payment.succeeded', 'payment.failed', 'subscription.created', 'subscription.updated', 'subscription.renewed', 'subscription.cancelled', 'subscription.expired', 'invoice.created', 'invoice.payment_failed', 'refund.processed')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "webhook_events" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "provider" "public"."webhook_events_provider_enum" NOT NULL, "providerEventId" character varying NOT NULL, "eventType" "public"."webhook_events_eventtype_enum" NOT NULL, "payload" jsonb NOT NULL, "processedAt" TIMESTAMP, "isProcessed" boolean NOT NULL DEFAULT false, "processingError" text, "retryCount" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_4cba37e6a0acb5e1fc49c34ebfd" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_7b5b3ab6292671f4248bd2e0f7" ON "webhook_events" ("isProcessed") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_d33f799688d1bd44cf64b8f80f" ON "webhook_events" ("processedAt") `,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_f9824a75e1373c0a43c0d8d17c" ON "webhook_events" ("provider", "providerEventId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."region_currencies_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."region_currencies_paymentprovider_enum" AS ENUM('stripe', 'paystack')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "region_currencies" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "regionCode" character varying NOT NULL, "regionName" character varying NOT NULL, "currency" "public"."region_currencies_currency_enum" NOT NULL DEFAULT 'USD', "paymentProvider" "public"."region_currencies_paymentprovider_enum" NOT NULL DEFAULT 'stripe', "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "UQ_4fe163aa8c4cba2137739ad6303" UNIQUE ("regionCode"), CONSTRAINT "PK_e14d0b0063b643f89b096982304" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_eb430a390b1e94d5757d255875" ON "region_currencies" ("isActive") `,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_4fe163aa8c4cba2137739ad630" ON "region_currencies" ("regionCode") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "exam_types" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "description" text, "minSubjectsSelectable" integer NOT NULL, "maxSubjectsSelectable" integer NOT NULL, "freeTierQuestionLimit" integer NOT NULL DEFAULT '50', "supportedCategories" json NOT NULL DEFAULT '["objectives"]', "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "UQ_d061a7cd341fb259ba6420ec607" UNIQUE ("name"), CONSTRAINT "PK_aa2897f3176ef22cc87e38224cb" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."exam_attempts_mode_enum" AS ENUM('revision', 'timed', 'mock')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."exam_attempts_status_enum" AS ENUM('in_progress', 'completed', 'auto_submitted')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "exam_attempts" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "mode" "public"."exam_attempts_mode_enum" NOT NULL, "selectedSubjects" json NOT NULL, "totalQuestions" integer NOT NULL, "correctAnswers" integer NOT NULL DEFAULT '0', "wrongAnswers" integer NOT NULL DEFAULT '0', "unanswered" integer NOT NULL DEFAULT '0', "scorePercentage" double precision NOT NULL DEFAULT '0', "totalMarksObtained" double precision NOT NULL DEFAULT '0', "totalMarksPossible" double precision NOT NULL DEFAULT '0', "questionResponses" json NOT NULL, "timeSpentSeconds" integer NOT NULL DEFAULT '0', "timeLimitSeconds" integer, "status" "public"."exam_attempts_status_enum" NOT NULL DEFAULT 'in_progress', "startedAt" TIMESTAMP NOT NULL, "completedAt" TIMESTAMP, "questionIds" json, "draftResponses" json, CONSTRAINT "PK_4eb6c7775e0a9c178ef7f4826f9" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "student_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "defaultExamTypeId" uuid, "lastExamTypeId" character varying, "totalQuestionsSolved" integer NOT NULL DEFAULT '0', "totalCorrect" integer NOT NULL DEFAULT '0', "totalWrong" integer NOT NULL DEFAULT '0', "overallAccuracy" double precision NOT NULL DEFAULT '0', "hasEverSubscribed" boolean NOT NULL DEFAULT false, "isSponsored" boolean NOT NULL DEFAULT false, "sponsorId" character varying, "sponsorUrlId" character varying, "sponsorDisplayName" character varying, CONSTRAINT "REL_064d129936a1e821d637ee8c88" UNIQUE ("userId"), CONSTRAINT "PK_5ed0a32eeaddfe812fb326177d0" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_26aa2ff3c3d94673d8870bf767" ON "student_profiles" ("sponsorId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."affiliate_referrals_usertype_enum" AS ENUM('student', 'sponsor')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "affiliate_referrals" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "referredUserId" uuid NOT NULL, "userType" "public"."affiliate_referrals_usertype_enum" NOT NULL, "commissionPaid" boolean NOT NULL DEFAULT false, "hasSubscribed" boolean NOT NULL DEFAULT false, "subscribedAt" TIMESTAMP, "totalRevenueGenerated" double precision NOT NULL DEFAULT '0', CONSTRAINT "REL_c5a12ed95da261311593d0d06f" UNIQUE ("referredUserId"), CONSTRAINT "PK_edd63337ee288c94db0a6b6772c" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."commissions_status_enum" AS ENUM('pending', 'paid')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."commissions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "commissions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "referralId" uuid NOT NULL, "amount" double precision NOT NULL, "status" "public"."commissions_status_enum" NOT NULL DEFAULT 'pending', "paidAt" TIMESTAMP, "subscriptionId" uuid, "subscriptionAmount" double precision, "currency" "public"."commissions_currency_enum", "planName" character varying, CONSTRAINT "PK_2701379966e2e670bb5ff0ae78e" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "affiliate_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "affiliateCode" character varying NOT NULL, "totalReferrals" integer NOT NULL DEFAULT '0', "totalEarnings" double precision NOT NULL DEFAULT '0', "pendingBalance" double precision NOT NULL DEFAULT '0', "totalConversions" integer NOT NULL DEFAULT '0', "totalPaidOut" double precision NOT NULL DEFAULT '0', CONSTRAINT "UQ_e178542c24715cd70b1f5f03b36" UNIQUE ("affiliateCode"), CONSTRAINT "REL_83755235707b72b56985c1f986" UNIQUE ("userId"), CONSTRAINT "PK_280950d636741f65f3f98968923" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."users_role_enum" AS ENUM('student', 'sponsor', 'affiliate', 'admin')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."users_provider_enum" AS ENUM('local', 'google', 'dual')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "users" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "email" character varying NOT NULL, "password" character varying, "firstName" character varying NOT NULL, "lastName" character varying NOT NULL, "phoneNumber" character varying, "countryCode" character varying, "picture" character varying, "role" "public"."users_role_enum", "provider" "public"."users_provider_enum" NOT NULL DEFAULT 'local', "googleId" character varying, "emailVerified" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "lastLogin" TIMESTAMP, CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "student_exam_type_subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentExamTypeId" uuid NOT NULL, "subjectId" uuid NOT NULL, CONSTRAINT "PK_f93e880d7cd08828cd179cddd5e" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_c9529597f1e0426f11b01c2aed" ON "student_exam_type_subjects" ("studentExamTypeId", "subjectId") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "passages" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeSubjectId" uuid NOT NULL, "title" text NOT NULL, "content" text NOT NULL, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_5f625d72252d22b1826b4ac79cf" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "topics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "subjectId" uuid NOT NULL, "name" character varying NOT NULL, "content" text, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_e4aa99a3fa60ec3a37d1fc4e853" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_1e5f6d28b7a1d488e92861f1ee" ON "topics" ("subjectId", "name") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_38b54068d2482668ba8f81a59a" ON "topics" ("subjectId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."questions_type_enum" AS ENUM('multiple_choice', 'essay', 'true_false', 'fill_in_the_blank', 'matching', 'multiple_response', 'short_answer')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."questions_category_enum" AS ENUM('objectives', 'theory', 'practical')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."questions_difficulty_enum" AS ENUM('easy', 'medium', 'hard')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "questions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeSubjectId" uuid NOT NULL, "passageId" uuid, "questionText" text NOT NULL, "options" json, "type" "public"."questions_type_enum" NOT NULL, "correctAnswer" json, "topicId" uuid, "explanationShort" text, "explanationLong" text, "validationConfig" json, "category" "public"."questions_category_enum" NOT NULL DEFAULT 'objectives', "difficulty" "public"."questions_difficulty_enum" NOT NULL DEFAULT 'medium', "marks" double precision NOT NULL DEFAULT '1', "isActive" boolean NOT NULL DEFAULT true, "timesAttempted" integer NOT NULL DEFAULT '0', "timesCorrect" integer NOT NULL DEFAULT '0', "legacyId" character varying, CONSTRAINT "UQ_afbe58b8f43ba71147c5f7bb1a7" UNIQUE ("legacyId"), CONSTRAINT "PK_08a6d4b0f49ff300bf3a0ca60ac" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "question_progress" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "questionId" uuid NOT NULL, "isDone" boolean NOT NULL DEFAULT false, "timesAttempted" integer NOT NULL DEFAULT '0', "timesCorrect" integer NOT NULL DEFAULT '0', "timesWrong" integer NOT NULL DEFAULT '0', "lastAttempted" TIMESTAMP, CONSTRAINT "PK_4b2729de0fb92f5960ac1ca4762" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_b701e1866e3f3ede56b4ba8a1c" ON "question_progress" ("studentId", "questionId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."flagged_questions_flagtype_enum" AS ENUM('difficult', 'error', 'report')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "flagged_questions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "questionId" uuid NOT NULL, "reason" text, "flagType" "public"."flagged_questions_flagtype_enum" NOT NULL DEFAULT 'error', "adminReviewed" boolean NOT NULL DEFAULT false, "flaggedAt" TIMESTAMP NOT NULL, CONSTRAINT "PK_e1aaae07978d0aecda4fa07a782" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "push_subscriptions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "endpoint" character varying NOT NULL, "p256dh" character varying NOT NULL, "auth" character varying NOT NULL, "userAgent" character varying, CONSTRAINT "UQ_0008bdfd174e533a3f98bf9af16" UNIQUE ("endpoint"), CONSTRAINT "PK_757fc8f00c34f66832668dc2e53" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4cc061875e9eecc311a94b3e43" ON "push_subscriptions" ("userId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."notifications_type_enum" AS ENUM('new_message', 'new_chatroom', 'giveback_activated', 'subscription_expiring', 'subscription_expired', 'exam_result', 'flagged_message_reviewed')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "notifications" ("id" uuid NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "recipientId" character varying NOT NULL, "type" "public"."notifications_type_enum" NOT NULL, "title" character varying NOT NULL, "body" text NOT NULL, "url" character varying NOT NULL, "isRead" boolean NOT NULL DEFAULT false, "readAt" TIMESTAMP WITH TIME ZONE, "metadata" jsonb, CONSTRAINT "PK_6a72c3c0f683f6462415e653c3a" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_ba953fe98c085411bba8535299" ON "notifications" ("recipientId", "isRead", "createdAt") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."activity_logs_action_enum" AS ENUM('login', 'signup', 'exam_start', 'exam_submit', 'payment', 'error', 'system', 'other', 'create', 'read', 'update', 'delete')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."activity_logs_severity_enum" AS ENUM('info', 'warning', 'error', 'critical')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "activity_logs" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid, "action" "public"."activity_logs_action_enum" NOT NULL, "description" text NOT NULL, "metadata" json, "severity" "public"."activity_logs_severity_enum" NOT NULL DEFAULT 'info', CONSTRAINT "PK_f25287b6140c5ba18d38776a796" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "user_presence" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "isOnline" boolean NOT NULL DEFAULT false, "lastSeenAt" TIMESTAMP, CONSTRAINT "UQ_b06e00b58bf86a3772b1251ac02" UNIQUE ("userId"), CONSTRAINT "REL_b06e00b58bf86a3772b1251ac0" UNIQUE ("userId"), CONSTRAINT "PK_562d693ca2ee27d96b75ff78eda" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "chatroom_participants" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "chatroomId" uuid NOT NULL, "userId" uuid NOT NULL, "lastReadAt" TIMESTAMP WITH TIME ZONE, CONSTRAINT "UQ_47e73457924c40837b30445600e" UNIQUE ("chatroomId", "userId"), CONSTRAINT "PK_966669efaeec6de6b72e9752312" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_1b117714877b45d9dafe069b76" ON "chatroom_participants" ("userId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."chat_messages_deliverystatus_enum" AS ENUM('sent', 'read')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "chat_messages" ("id" uuid NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "chatroomId" uuid NOT NULL, "senderId" uuid NOT NULL, "content" text NOT NULL, "deliveryStatus" "public"."chat_messages_deliverystatus_enum" NOT NULL DEFAULT 'sent', "deletedAt" TIMESTAMP, "isFlagged" boolean NOT NULL DEFAULT false, "flagReason" text, CONSTRAINT "PK_40c55ee0e571e268b0d3cd37d10" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_edbdfa54b1fd594945e43ca30f" ON "chat_messages" ("chatroomId", "createdAt") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."chatrooms_type_enum" AS ENUM('sponsor_student', 'student_student')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "chatrooms" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "type" "public"."chatrooms_type_enum" NOT NULL DEFAULT 'sponsor_student', CONSTRAINT "PK_d190d6f785fb99dffb138cd0443" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_54b94971ac7cc6af25721f8357" ON "chatrooms" ("createdAt") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."message_flags_status_enum" AS ENUM('pending', 'reviewed', 'dismissed')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "message_flags" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "messageId" uuid NOT NULL, "chatroomId" uuid NOT NULL, "reportedByUserId" uuid NOT NULL, "reason" text, "status" "public"."message_flags_status_enum" NOT NULL DEFAULT 'pending', "adminNotes" text, "reviewedByAdminId" character varying, "reviewedAt" TIMESTAMP, CONSTRAINT "PK_a5b3b8f05e0e5a58914dae6b178" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_8bf526a106ddc82800e9bc59f7" ON "message_flags" ("status") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "password_reset_tokens" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "token" text NOT NULL, "userId" uuid NOT NULL, "expiresAt" TIMESTAMP NOT NULL, "used" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_d16bebd73e844c48bca50ff8d3d" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_d6a19d4b4f6c62dcd29daa497e" ON "password_reset_tokens" ("userId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_ab673f0e63eac966762155508e" ON "password_reset_tokens" ("token") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "onboarding_tokens" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "token" character varying NOT NULL, "isUsed" boolean NOT NULL DEFAULT false, "usedAt" TIMESTAMP, CONSTRAINT "UQ_8f8b5f36d2ffe14ec26d68824e8" UNIQUE ("token"), CONSTRAINT "PK_0d4f9cc4392b0553096d84f461a" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "email_verification_codes" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "code" text NOT NULL, "userId" uuid NOT NULL, "expiresAt" TIMESTAMP NOT NULL, "used" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_5bb1cbeebcbcb38996911bff8d4" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_97bef998b0d463cb053643822a" ON "email_verification_codes" ("userId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4d6d04ed4d25fab71f214490af" ON "email_verification_codes" ("code") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "student_subject_analytics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "subjectId" uuid NOT NULL, "date" date NOT NULL, "questionsAttempted" integer NOT NULL DEFAULT '0', "questionsCorrect" integer NOT NULL DEFAULT '0', "questionsWrong" integer NOT NULL DEFAULT '0', "accuracyPercentage" double precision NOT NULL DEFAULT '0', "averageScore" double precision NOT NULL DEFAULT '0', "essayQuestionsAttempted" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_df0ccea5a3bef86fe9fc8ad2460" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_614956a91d200887713256de63" ON "student_subject_analytics" ("studentId", "examTypeId", "subjectId", "date") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "student_streaks" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "currentStreak" integer NOT NULL DEFAULT '0', "longestStreak" integer NOT NULL DEFAULT '0', "lastActivityDate" date, CONSTRAINT "UQ_07999ab7ee43f29a26463b4a655" UNIQUE ("studentId"), CONSTRAINT "REL_07999ab7ee43f29a26463b4a65" UNIQUE ("studentId"), CONSTRAINT "PK_1713b7ca6705a6904fb54cab5e2" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "student_daily_analytics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "date" date NOT NULL, "questionsAttempted" integer NOT NULL DEFAULT '0', "questionsCorrect" integer NOT NULL DEFAULT '0', "questionsWrong" integer NOT NULL DEFAULT '0', "questionsUnanswered" integer NOT NULL DEFAULT '0', "accuracyPercentage" double precision NOT NULL DEFAULT '0', "examsCompleted" integer NOT NULL DEFAULT '0', "averageScore" double precision NOT NULL DEFAULT '0', "totalTimeSpentSeconds" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_a781be2e9e8d79717a8f1d946fb" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_6dcc898c1abf4bd0e5abb8e229" ON "student_daily_analytics" ("studentId", "examTypeId", "date") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "platform_daily_analytics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "date" date NOT NULL, "newStudents" integer NOT NULL DEFAULT '0', "newSponsors" integer NOT NULL DEFAULT '0', "newAffiliates" integer NOT NULL DEFAULT '0', "activeStudents" integer NOT NULL DEFAULT '0', "activeSponsors" integer NOT NULL DEFAULT '0', "activeAffiliates" integer NOT NULL DEFAULT '0', "totalRevenue" double precision NOT NULL DEFAULT '0', "totalExpenses" double precision NOT NULL DEFAULT '0', "totalProfit" double precision NOT NULL DEFAULT '0', "newSubscriptions" integer NOT NULL DEFAULT '0', "cancelledSubscriptions" integer NOT NULL DEFAULT '0', "demoUsers" integer NOT NULL DEFAULT '0', "premiumUsers" integer NOT NULL DEFAULT '0', CONSTRAINT "UQ_35e3c6775b915f9b8c96baaf28b" UNIQUE ("date"), CONSTRAINT "PK_3ceb09ff44ba4bba605c81416ac" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_35e3c6775b915f9b8c96baaf28" ON "platform_daily_analytics" ("date") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "affiliate_daily_analytics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "date" date NOT NULL, "newReferrals" integer NOT NULL DEFAULT '0', "conversions" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_9d3ccc4a139cf9d71cb537159e9" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_ec1b1140bacc6871923daf39fe" ON "affiliate_daily_analytics" ("affiliateId", "date") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."affiliate_payouts_status_enum" AS ENUM('pending', 'processing', 'completed', 'failed')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "affiliate_payouts" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "amount" double precision NOT NULL, "status" "public"."affiliate_payouts_status_enum" NOT NULL DEFAULT 'pending', "paymentMethod" character varying, "paymentDetails" json, "processedAt" TIMESTAMP, "failureReason" text, CONSTRAINT "PK_bb16ad268019be269f02c660016" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_196f8ddf419a42dae14b14bc0c" ON "affiliate_payouts" ("affiliateId", "createdAt") `,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "refresh_tokens" ADD CONSTRAINT "FK_610102b60fea1455310ccd299de" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_type_subjects" ADD CONSTRAINT "FK_5f29880ca05563c3251dbd803ab" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_type_subjects" ADD CONSTRAINT "FK_9c561cb7cee62e72adc49692d40" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_configs" ADD CONSTRAINT "FK_4c8a1e666329466d98884ba0e84" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsorships" ADD CONSTRAINT "FK_11300c2ba3817ba2c81eba0b8cc" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsorships" ADD CONSTRAINT "FK_821b8a0385a3b6a28c7f84bf6cd" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsorships" ADD CONSTRAINT "FK_9a1dcfb4803db5566f968f2bf72" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "donations" ADD CONSTRAINT "FK_6e2eefb71a05427462881769627" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsor_urls" ADD CONSTRAINT "FK_a35f76693f9e1751dc442720a80" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsor_student_invites" ADD CONSTRAINT "FK_73a50ba6c8afc656922fe31c9b0" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "givebacks" ADD CONSTRAINT "FK_8d08f5e24a828005eea2dbe5902" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsor_profiles" ADD CONSTRAINT "FK_4a88c1e9189bc4559f85363a21a" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "plan_prices" ADD CONSTRAINT "FK_eb2f222f91a8e78e9e1d591b0de" FOREIGN KEY ("planId") REFERENCES "subscription_plans"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscription_plans" ADD CONSTRAINT "FK_cafccb3e544becc80d7f2e8ca10" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_types" ADD CONSTRAINT "FK_7475c7eca5638af23ed43dbe2ec" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_types" ADD CONSTRAINT "FK_b7274ed14dd16c7eddd10e1d557" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_types" ADD CONSTRAINT "FK_dce8e01bcfbfb138108782499f9" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" ADD CONSTRAINT "FK_a37b6cb6943f9c6b11dbfe168a0" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" ADD CONSTRAINT "FK_2c938f18f0fea39b8fc971f03a9" FOREIGN KEY ("studentExamTypeId") REFERENCES "student_exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" ADD CONSTRAINT "FK_68b3182f3f5d4d5a0f41c12139b" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" ADD CONSTRAINT "FK_a5d9d595b71f889104a0e103162" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_f62e9a735f10ce6006ac230fcf9" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_6514ddf48ea7499c62efa6c0a41" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_7536cba909dd7584a4640cad7d5" FOREIGN KEY ("planId") REFERENCES "subscription_plans"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_2bc6920dce9ce914dd46cabe847" FOREIGN KEY ("planPriceId") REFERENCES "plan_prices"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_785d7001d101cf06d1147cea3ae" FOREIGN KEY ("sponsorId") REFERENCES "sponsor_profiles"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_attempts" ADD CONSTRAINT "FK_b3cfd8fad204570a1d448846892" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_attempts" ADD CONSTRAINT "FK_9172b980d49d753322ce4eecc1b" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_profiles" ADD CONSTRAINT "FK_064d129936a1e821d637ee8c88e" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_profiles" ADD CONSTRAINT "FK_d6d200ca910a2124e36eab1177e" FOREIGN KEY ("defaultExamTypeId") REFERENCES "exam_types"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_referrals" ADD CONSTRAINT "FK_82d96020b31bc03f7a8b961da6f" FOREIGN KEY ("affiliateId") REFERENCES "affiliate_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_referrals" ADD CONSTRAINT "FK_c5a12ed95da261311593d0d06f8" FOREIGN KEY ("referredUserId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "commissions" ADD CONSTRAINT "FK_b8590f437bdcd64573cabe89c15" FOREIGN KEY ("affiliateId") REFERENCES "affiliate_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "commissions" ADD CONSTRAINT "FK_fc9157673a130aada3e4a5ed1b0" FOREIGN KEY ("referralId") REFERENCES "affiliate_referrals"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "commissions" ADD CONSTRAINT "FK_f5b6fb40f80d8d11dc8af536fb0" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_profiles" ADD CONSTRAINT "FK_83755235707b72b56985c1f9864" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_type_subjects" ADD CONSTRAINT "FK_70596ba679fd1683e8e0c0c1ce9" FOREIGN KEY ("studentExamTypeId") REFERENCES "student_exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_type_subjects" ADD CONSTRAINT "FK_d61ed4721979e642e9cdd7d5deb" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "passages" ADD CONSTRAINT "FK_9fbfea3e16e05a89274192a57a6" FOREIGN KEY ("examTypeSubjectId") REFERENCES "exam_type_subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "topics" ADD CONSTRAINT "FK_38b54068d2482668ba8f81a59ae" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "questions" ADD CONSTRAINT "FK_e5d76861587b8a6472ec7a26c74" FOREIGN KEY ("topicId") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "questions" ADD CONSTRAINT "FK_e2d2fc7472851dfe305c631c047" FOREIGN KEY ("examTypeSubjectId") REFERENCES "exam_type_subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "questions" ADD CONSTRAINT "FK_9639bdb4fa738fcb27904b8ddac" FOREIGN KEY ("passageId") REFERENCES "passages"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "question_progress" ADD CONSTRAINT "FK_dcbbe06b2bd4c2f26ef9faa0a15" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "question_progress" ADD CONSTRAINT "FK_443b500c79876621023b0b407d4" FOREIGN KEY ("questionId") REFERENCES "questions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "flagged_questions" ADD CONSTRAINT "FK_70019fffbbf0d65bd75e3c64994" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "flagged_questions" ADD CONSTRAINT "FK_4664eace4e8540223cd3012a553" FOREIGN KEY ("questionId") REFERENCES "questions"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "push_subscriptions" ADD CONSTRAINT "FK_4cc061875e9eecc311a94b3e431" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "activity_logs" ADD CONSTRAINT "FK_597e6df96098895bf19d4b5ea45" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user_presence" ADD CONSTRAINT "FK_b06e00b58bf86a3772b1251ac02" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chatroom_participants" ADD CONSTRAINT "FK_ce49606b5d6ea554ad7d5072f43" FOREIGN KEY ("chatroomId") REFERENCES "chatrooms"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chatroom_participants" ADD CONSTRAINT "FK_1b117714877b45d9dafe069b763" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chat_messages" ADD CONSTRAINT "FK_caaefe3be72bc2776108f664464" FOREIGN KEY ("chatroomId") REFERENCES "chatrooms"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chat_messages" ADD CONSTRAINT "FK_fc6b58e41e9a871dacbe9077def" FOREIGN KEY ("senderId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "message_flags" ADD CONSTRAINT "FK_ed6725a3c86b7e5e299bf731fb5" FOREIGN KEY ("messageId") REFERENCES "chat_messages"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "message_flags" ADD CONSTRAINT "FK_4e54bfe9b919314d90f3892f117" FOREIGN KEY ("chatroomId") REFERENCES "chatrooms"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "message_flags" ADD CONSTRAINT "FK_9b53c21c267876eda8cba50d5ac" FOREIGN KEY ("reportedByUserId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "FK_d6a19d4b4f6c62dcd29daa497e2" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "onboarding_tokens" ADD CONSTRAINT "FK_9679108bcfe1038d71a4154efcc" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "email_verification_codes" ADD CONSTRAINT "FK_97bef998b0d463cb053643822a3" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_subject_analytics" ADD CONSTRAINT "FK_813dad1bbe4c252b72960d02e31" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_subject_analytics" ADD CONSTRAINT "FK_8e38f168f2a133dec72cab28017" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_subject_analytics" ADD CONSTRAINT "FK_26e0e94dea0b20bef96596bf319" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_streaks" ADD CONSTRAINT "FK_07999ab7ee43f29a26463b4a655" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_daily_analytics" ADD CONSTRAINT "FK_b0ffcbebb33f62b61129b6e9c08" FOREIGN KEY ("studentId") REFERENCES "student_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_daily_analytics" ADD CONSTRAINT "FK_1d24f38e7c0cd78e0dbdc6c2c46" FOREIGN KEY ("examTypeId") REFERENCES "exam_types"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_daily_analytics" ADD CONSTRAINT "FK_abe4593804f12cf4c78c86377b2" FOREIGN KEY ("affiliateId") REFERENCES "affiliate_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_payouts" ADD CONSTRAINT "FK_c606e40904640ea34c1b025beb5" FOREIGN KEY ("affiliateId") REFERENCES "affiliate_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "affiliate_payouts" DROP CONSTRAINT "FK_c606e40904640ea34c1b025beb5"`);
-        await queryRunner.query(`ALTER TABLE "affiliate_daily_analytics" DROP CONSTRAINT "FK_abe4593804f12cf4c78c86377b2"`);
-        await queryRunner.query(`ALTER TABLE "student_daily_analytics" DROP CONSTRAINT "FK_1d24f38e7c0cd78e0dbdc6c2c46"`);
-        await queryRunner.query(`ALTER TABLE "student_daily_analytics" DROP CONSTRAINT "FK_b0ffcbebb33f62b61129b6e9c08"`);
-        await queryRunner.query(`ALTER TABLE "student_streaks" DROP CONSTRAINT "FK_07999ab7ee43f29a26463b4a655"`);
-        await queryRunner.query(`ALTER TABLE "student_subject_analytics" DROP CONSTRAINT "FK_26e0e94dea0b20bef96596bf319"`);
-        await queryRunner.query(`ALTER TABLE "student_subject_analytics" DROP CONSTRAINT "FK_8e38f168f2a133dec72cab28017"`);
-        await queryRunner.query(`ALTER TABLE "student_subject_analytics" DROP CONSTRAINT "FK_813dad1bbe4c252b72960d02e31"`);
-        await queryRunner.query(`ALTER TABLE "email_verification_codes" DROP CONSTRAINT "FK_97bef998b0d463cb053643822a3"`);
-        await queryRunner.query(`ALTER TABLE "onboarding_tokens" DROP CONSTRAINT "FK_9679108bcfe1038d71a4154efcc"`);
-        await queryRunner.query(`ALTER TABLE "password_reset_tokens" DROP CONSTRAINT "FK_d6a19d4b4f6c62dcd29daa497e2"`);
-        await queryRunner.query(`ALTER TABLE "message_flags" DROP CONSTRAINT "FK_9b53c21c267876eda8cba50d5ac"`);
-        await queryRunner.query(`ALTER TABLE "message_flags" DROP CONSTRAINT "FK_4e54bfe9b919314d90f3892f117"`);
-        await queryRunner.query(`ALTER TABLE "message_flags" DROP CONSTRAINT "FK_ed6725a3c86b7e5e299bf731fb5"`);
-        await queryRunner.query(`ALTER TABLE "chat_messages" DROP CONSTRAINT "FK_fc6b58e41e9a871dacbe9077def"`);
-        await queryRunner.query(`ALTER TABLE "chat_messages" DROP CONSTRAINT "FK_caaefe3be72bc2776108f664464"`);
-        await queryRunner.query(`ALTER TABLE "chatroom_participants" DROP CONSTRAINT "FK_1b117714877b45d9dafe069b763"`);
-        await queryRunner.query(`ALTER TABLE "chatroom_participants" DROP CONSTRAINT "FK_ce49606b5d6ea554ad7d5072f43"`);
-        await queryRunner.query(`ALTER TABLE "user_presence" DROP CONSTRAINT "FK_b06e00b58bf86a3772b1251ac02"`);
-        await queryRunner.query(`ALTER TABLE "activity_logs" DROP CONSTRAINT "FK_597e6df96098895bf19d4b5ea45"`);
-        await queryRunner.query(`ALTER TABLE "push_subscriptions" DROP CONSTRAINT "FK_4cc061875e9eecc311a94b3e431"`);
-        await queryRunner.query(`ALTER TABLE "flagged_questions" DROP CONSTRAINT "FK_4664eace4e8540223cd3012a553"`);
-        await queryRunner.query(`ALTER TABLE "flagged_questions" DROP CONSTRAINT "FK_70019fffbbf0d65bd75e3c64994"`);
-        await queryRunner.query(`ALTER TABLE "question_progress" DROP CONSTRAINT "FK_443b500c79876621023b0b407d4"`);
-        await queryRunner.query(`ALTER TABLE "question_progress" DROP CONSTRAINT "FK_dcbbe06b2bd4c2f26ef9faa0a15"`);
-        await queryRunner.query(`ALTER TABLE "questions" DROP CONSTRAINT "FK_9639bdb4fa738fcb27904b8ddac"`);
-        await queryRunner.query(`ALTER TABLE "questions" DROP CONSTRAINT "FK_e2d2fc7472851dfe305c631c047"`);
-        await queryRunner.query(`ALTER TABLE "questions" DROP CONSTRAINT "FK_e5d76861587b8a6472ec7a26c74"`);
-        await queryRunner.query(`ALTER TABLE "topics" DROP CONSTRAINT "FK_38b54068d2482668ba8f81a59ae"`);
-        await queryRunner.query(`ALTER TABLE "passages" DROP CONSTRAINT "FK_9fbfea3e16e05a89274192a57a6"`);
-        await queryRunner.query(`ALTER TABLE "student_exam_type_subjects" DROP CONSTRAINT "FK_d61ed4721979e642e9cdd7d5deb"`);
-        await queryRunner.query(`ALTER TABLE "student_exam_type_subjects" DROP CONSTRAINT "FK_70596ba679fd1683e8e0c0c1ce9"`);
-        await queryRunner.query(`ALTER TABLE "affiliate_profiles" DROP CONSTRAINT "FK_83755235707b72b56985c1f9864"`);
-        await queryRunner.query(`ALTER TABLE "commissions" DROP CONSTRAINT "FK_f5b6fb40f80d8d11dc8af536fb0"`);
-        await queryRunner.query(`ALTER TABLE "commissions" DROP CONSTRAINT "FK_fc9157673a130aada3e4a5ed1b0"`);
-        await queryRunner.query(`ALTER TABLE "commissions" DROP CONSTRAINT "FK_b8590f437bdcd64573cabe89c15"`);
-        await queryRunner.query(`ALTER TABLE "affiliate_referrals" DROP CONSTRAINT "FK_c5a12ed95da261311593d0d06f8"`);
-        await queryRunner.query(`ALTER TABLE "affiliate_referrals" DROP CONSTRAINT "FK_82d96020b31bc03f7a8b961da6f"`);
-        await queryRunner.query(`ALTER TABLE "student_profiles" DROP CONSTRAINT "FK_d6d200ca910a2124e36eab1177e"`);
-        await queryRunner.query(`ALTER TABLE "student_profiles" DROP CONSTRAINT "FK_064d129936a1e821d637ee8c88e"`);
-        await queryRunner.query(`ALTER TABLE "exam_attempts" DROP CONSTRAINT "FK_9172b980d49d753322ce4eecc1b"`);
-        await queryRunner.query(`ALTER TABLE "exam_attempts" DROP CONSTRAINT "FK_b3cfd8fad204570a1d448846892"`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_785d7001d101cf06d1147cea3ae"`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_2bc6920dce9ce914dd46cabe847"`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_7536cba909dd7584a4640cad7d5"`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_6514ddf48ea7499c62efa6c0a41"`);
-        await queryRunner.query(`ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_f62e9a735f10ce6006ac230fcf9"`);
-        await queryRunner.query(`ALTER TABLE "transactions" DROP CONSTRAINT "FK_a5d9d595b71f889104a0e103162"`);
-        await queryRunner.query(`ALTER TABLE "transactions" DROP CONSTRAINT "FK_68b3182f3f5d4d5a0f41c12139b"`);
-        await queryRunner.query(`ALTER TABLE "transactions" DROP CONSTRAINT "FK_2c938f18f0fea39b8fc971f03a9"`);
-        await queryRunner.query(`ALTER TABLE "transactions" DROP CONSTRAINT "FK_a37b6cb6943f9c6b11dbfe168a0"`);
-        await queryRunner.query(`ALTER TABLE "student_exam_types" DROP CONSTRAINT "FK_dce8e01bcfbfb138108782499f9"`);
-        await queryRunner.query(`ALTER TABLE "student_exam_types" DROP CONSTRAINT "FK_b7274ed14dd16c7eddd10e1d557"`);
-        await queryRunner.query(`ALTER TABLE "student_exam_types" DROP CONSTRAINT "FK_7475c7eca5638af23ed43dbe2ec"`);
-        await queryRunner.query(`ALTER TABLE "subscription_plans" DROP CONSTRAINT "FK_cafccb3e544becc80d7f2e8ca10"`);
-        await queryRunner.query(`ALTER TABLE "plan_prices" DROP CONSTRAINT "FK_eb2f222f91a8e78e9e1d591b0de"`);
-        await queryRunner.query(`ALTER TABLE "sponsor_profiles" DROP CONSTRAINT "FK_4a88c1e9189bc4559f85363a21a"`);
-        await queryRunner.query(`ALTER TABLE "givebacks" DROP CONSTRAINT "FK_8d08f5e24a828005eea2dbe5902"`);
-        await queryRunner.query(`ALTER TABLE "sponsor_student_invites" DROP CONSTRAINT "FK_73a50ba6c8afc656922fe31c9b0"`);
-        await queryRunner.query(`ALTER TABLE "sponsor_urls" DROP CONSTRAINT "FK_a35f76693f9e1751dc442720a80"`);
-        await queryRunner.query(`ALTER TABLE "donations" DROP CONSTRAINT "FK_6e2eefb71a05427462881769627"`);
-        await queryRunner.query(`ALTER TABLE "sponsorships" DROP CONSTRAINT "FK_9a1dcfb4803db5566f968f2bf72"`);
-        await queryRunner.query(`ALTER TABLE "sponsorships" DROP CONSTRAINT "FK_821b8a0385a3b6a28c7f84bf6cd"`);
-        await queryRunner.query(`ALTER TABLE "sponsorships" DROP CONSTRAINT "FK_11300c2ba3817ba2c81eba0b8cc"`);
-        await queryRunner.query(`ALTER TABLE "exam_configs" DROP CONSTRAINT "FK_4c8a1e666329466d98884ba0e84"`);
-        await queryRunner.query(`ALTER TABLE "exam_type_subjects" DROP CONSTRAINT "FK_9c561cb7cee62e72adc49692d40"`);
-        await queryRunner.query(`ALTER TABLE "exam_type_subjects" DROP CONSTRAINT "FK_5f29880ca05563c3251dbd803ab"`);
-        await queryRunner.query(`ALTER TABLE "refresh_tokens" DROP CONSTRAINT "FK_610102b60fea1455310ccd299de"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_196f8ddf419a42dae14b14bc0c"`);
-        await queryRunner.query(`DROP TABLE "affiliate_payouts"`);
-        await queryRunner.query(`DROP TYPE "public"."affiliate_payouts_status_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_ec1b1140bacc6871923daf39fe"`);
-        await queryRunner.query(`DROP TABLE "affiliate_daily_analytics"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_35e3c6775b915f9b8c96baaf28"`);
-        await queryRunner.query(`DROP TABLE "platform_daily_analytics"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_6dcc898c1abf4bd0e5abb8e229"`);
-        await queryRunner.query(`DROP TABLE "student_daily_analytics"`);
-        await queryRunner.query(`DROP TABLE "student_streaks"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_614956a91d200887713256de63"`);
-        await queryRunner.query(`DROP TABLE "student_subject_analytics"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_4d6d04ed4d25fab71f214490af"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_97bef998b0d463cb053643822a"`);
-        await queryRunner.query(`DROP TABLE "email_verification_codes"`);
-        await queryRunner.query(`DROP TABLE "onboarding_tokens"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_ab673f0e63eac966762155508e"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_d6a19d4b4f6c62dcd29daa497e"`);
-        await queryRunner.query(`DROP TABLE "password_reset_tokens"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_8bf526a106ddc82800e9bc59f7"`);
-        await queryRunner.query(`DROP TABLE "message_flags"`);
-        await queryRunner.query(`DROP TYPE "public"."message_flags_status_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_54b94971ac7cc6af25721f8357"`);
-        await queryRunner.query(`DROP TABLE "chatrooms"`);
-        await queryRunner.query(`DROP TYPE "public"."chatrooms_type_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_edbdfa54b1fd594945e43ca30f"`);
-        await queryRunner.query(`DROP TABLE "chat_messages"`);
-        await queryRunner.query(`DROP TYPE "public"."chat_messages_deliverystatus_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_1b117714877b45d9dafe069b76"`);
-        await queryRunner.query(`DROP TABLE "chatroom_participants"`);
-        await queryRunner.query(`DROP TABLE "user_presence"`);
-        await queryRunner.query(`DROP TABLE "activity_logs"`);
-        await queryRunner.query(`DROP TYPE "public"."activity_logs_severity_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."activity_logs_action_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_ba953fe98c085411bba8535299"`);
-        await queryRunner.query(`DROP TABLE "notifications"`);
-        await queryRunner.query(`DROP TYPE "public"."notifications_type_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_4cc061875e9eecc311a94b3e43"`);
-        await queryRunner.query(`DROP TABLE "push_subscriptions"`);
-        await queryRunner.query(`DROP TABLE "flagged_questions"`);
-        await queryRunner.query(`DROP TYPE "public"."flagged_questions_flagtype_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_b701e1866e3f3ede56b4ba8a1c"`);
-        await queryRunner.query(`DROP TABLE "question_progress"`);
-        await queryRunner.query(`DROP TABLE "questions"`);
-        await queryRunner.query(`DROP TYPE "public"."questions_difficulty_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."questions_category_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."questions_type_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_38b54068d2482668ba8f81a59a"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_1e5f6d28b7a1d488e92861f1ee"`);
-        await queryRunner.query(`DROP TABLE "topics"`);
-        await queryRunner.query(`DROP TABLE "passages"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_c9529597f1e0426f11b01c2aed"`);
-        await queryRunner.query(`DROP TABLE "student_exam_type_subjects"`);
-        await queryRunner.query(`DROP TABLE "users"`);
-        await queryRunner.query(`DROP TYPE "public"."users_provider_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."users_role_enum"`);
-        await queryRunner.query(`DROP TABLE "affiliate_profiles"`);
-        await queryRunner.query(`DROP TABLE "commissions"`);
-        await queryRunner.query(`DROP TYPE "public"."commissions_currency_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."commissions_status_enum"`);
-        await queryRunner.query(`DROP TABLE "affiliate_referrals"`);
-        await queryRunner.query(`DROP TYPE "public"."affiliate_referrals_usertype_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_26aa2ff3c3d94673d8870bf767"`);
-        await queryRunner.query(`DROP TABLE "student_profiles"`);
-        await queryRunner.query(`DROP TABLE "exam_attempts"`);
-        await queryRunner.query(`DROP TYPE "public"."exam_attempts_status_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."exam_attempts_mode_enum"`);
-        await queryRunner.query(`DROP TABLE "exam_types"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_4fe163aa8c4cba2137739ad630"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_eb430a390b1e94d5757d255875"`);
-        await queryRunner.query(`DROP TABLE "region_currencies"`);
-        await queryRunner.query(`DROP TYPE "public"."region_currencies_paymentprovider_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."region_currencies_currency_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_f9824a75e1373c0a43c0d8d17c"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_d33f799688d1bd44cf64b8f80f"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_7b5b3ab6292671f4248bd2e0f7"`);
-        await queryRunner.query(`DROP TABLE "webhook_events"`);
-        await queryRunner.query(`DROP TYPE "public"."webhook_events_eventtype_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."webhook_events_provider_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_d506aa039b006b68031e0961ad"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_6ccf973355b70645eff37774de"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_4badeb2e2fbc3b527a60aea8e0"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_2eeb6283285e7ffc0afed6606a"`);
-        await queryRunner.query(`DROP TABLE "subscriptions"`);
-        await queryRunner.query(`DROP TYPE "public"."subscriptions_paymentprovider_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."subscriptions_currency_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."subscriptions_status_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_740a8adb463a50926709f20a4b"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_a37b6cb6943f9c6b11dbfe168a"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_a5d9d595b71f889104a0e10316"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_68b3182f3f5d4d5a0f41c12139"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_2c938f18f0fea39b8fc971f03a"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_91e31a934485712dd3e06c135b"`);
-        await queryRunner.query(`DROP TABLE "transactions"`);
-        await queryRunner.query(`DROP TYPE "public"."transactions_status_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."transactions_provider_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."transactions_currency_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."transactions_type_enum"`);
-        await queryRunner.query(`DROP TABLE "student_exam_types"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_561041009b4c715efc7ab7e2ec"`);
-        await queryRunner.query(`DROP TABLE "subscription_plans"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_216079c4298f848a15e49bd94b"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_9364fb2cc2379230cd250b2bd3"`);
-        await queryRunner.query(`DROP TABLE "plan_prices"`);
-        await queryRunner.query(`DROP TYPE "public"."plan_prices_currency_enum"`);
-        await queryRunner.query(`DROP TABLE "sponsor_profiles"`);
-        await queryRunner.query(`DROP TYPE "public"."sponsor_profiles_sponsortype_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_8d08f5e24a828005eea2dbe590"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_5d3646ce5aea43ec525cf6f626"`);
-        await queryRunner.query(`DROP TABLE "givebacks"`);
-        await queryRunner.query(`DROP TYPE "public"."givebacks_status_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."givebacks_currency_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."givebacks_type_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_4225924d7de67849f5d8c980bc"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_73a50ba6c8afc656922fe31c9b"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_eac4f77573ba490f1ecf4a0cf5"`);
-        await queryRunner.query(`DROP TABLE "sponsor_student_invites"`);
-        await queryRunner.query(`DROP TYPE "public"."sponsor_student_invites_status_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_370519f9fcee6e38d77038c1b3"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_a35f76693f9e1751dc442720a8"`);
-        await queryRunner.query(`DROP TABLE "sponsor_urls"`);
-        await queryRunner.query(`DROP TABLE "donations"`);
-        await queryRunner.query(`DROP TYPE "public"."donations_type_enum"`);
-        await queryRunner.query(`DROP TYPE "public"."donations_currency_enum"`);
-        await queryRunner.query(`DROP TABLE "sponsorships"`);
-        await queryRunner.query(`DROP TYPE "public"."sponsorships_status_enum"`);
-        await queryRunner.query(`DROP TABLE "exam_configs"`);
-        await queryRunner.query(`DROP TYPE "public"."exam_configs_mode_enum"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_cfadd3f990aa88cc96162ec4d2"`);
-        await queryRunner.query(`DROP TABLE "exam_type_subjects"`);
-        await queryRunner.query(`DROP TABLE "subjects"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_4542dd2f38a61354a040ba9fd5"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_610102b60fea1455310ccd299d"`);
-        await queryRunner.query(`DROP TABLE "refresh_tokens"`);
-        await queryRunner.query(`DROP TABLE "countries"`);
-        await queryRunner.query(`DROP TABLE "migration_history"`);
-    }
-
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_payouts" DROP CONSTRAINT "FK_c606e40904640ea34c1b025beb5"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_daily_analytics" DROP CONSTRAINT "FK_abe4593804f12cf4c78c86377b2"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_daily_analytics" DROP CONSTRAINT "FK_1d24f38e7c0cd78e0dbdc6c2c46"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_daily_analytics" DROP CONSTRAINT "FK_b0ffcbebb33f62b61129b6e9c08"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_streaks" DROP CONSTRAINT "FK_07999ab7ee43f29a26463b4a655"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_subject_analytics" DROP CONSTRAINT "FK_26e0e94dea0b20bef96596bf319"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_subject_analytics" DROP CONSTRAINT "FK_8e38f168f2a133dec72cab28017"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_subject_analytics" DROP CONSTRAINT "FK_813dad1bbe4c252b72960d02e31"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "email_verification_codes" DROP CONSTRAINT "FK_97bef998b0d463cb053643822a3"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "onboarding_tokens" DROP CONSTRAINT "FK_9679108bcfe1038d71a4154efcc"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "password_reset_tokens" DROP CONSTRAINT "FK_d6a19d4b4f6c62dcd29daa497e2"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "message_flags" DROP CONSTRAINT "FK_9b53c21c267876eda8cba50d5ac"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "message_flags" DROP CONSTRAINT "FK_4e54bfe9b919314d90f3892f117"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "message_flags" DROP CONSTRAINT "FK_ed6725a3c86b7e5e299bf731fb5"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chat_messages" DROP CONSTRAINT "FK_fc6b58e41e9a871dacbe9077def"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chat_messages" DROP CONSTRAINT "FK_caaefe3be72bc2776108f664464"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chatroom_participants" DROP CONSTRAINT "FK_1b117714877b45d9dafe069b763"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "chatroom_participants" DROP CONSTRAINT "FK_ce49606b5d6ea554ad7d5072f43"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user_presence" DROP CONSTRAINT "FK_b06e00b58bf86a3772b1251ac02"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "activity_logs" DROP CONSTRAINT "FK_597e6df96098895bf19d4b5ea45"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "push_subscriptions" DROP CONSTRAINT "FK_4cc061875e9eecc311a94b3e431"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "flagged_questions" DROP CONSTRAINT "FK_4664eace4e8540223cd3012a553"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "flagged_questions" DROP CONSTRAINT "FK_70019fffbbf0d65bd75e3c64994"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "question_progress" DROP CONSTRAINT "FK_443b500c79876621023b0b407d4"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "question_progress" DROP CONSTRAINT "FK_dcbbe06b2bd4c2f26ef9faa0a15"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "questions" DROP CONSTRAINT "FK_9639bdb4fa738fcb27904b8ddac"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "questions" DROP CONSTRAINT "FK_e2d2fc7472851dfe305c631c047"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "questions" DROP CONSTRAINT "FK_e5d76861587b8a6472ec7a26c74"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "topics" DROP CONSTRAINT "FK_38b54068d2482668ba8f81a59ae"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "passages" DROP CONSTRAINT "FK_9fbfea3e16e05a89274192a57a6"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_type_subjects" DROP CONSTRAINT "FK_d61ed4721979e642e9cdd7d5deb"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_type_subjects" DROP CONSTRAINT "FK_70596ba679fd1683e8e0c0c1ce9"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_profiles" DROP CONSTRAINT "FK_83755235707b72b56985c1f9864"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "commissions" DROP CONSTRAINT "FK_f5b6fb40f80d8d11dc8af536fb0"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "commissions" DROP CONSTRAINT "FK_fc9157673a130aada3e4a5ed1b0"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "commissions" DROP CONSTRAINT "FK_b8590f437bdcd64573cabe89c15"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_referrals" DROP CONSTRAINT "FK_c5a12ed95da261311593d0d06f8"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "affiliate_referrals" DROP CONSTRAINT "FK_82d96020b31bc03f7a8b961da6f"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_profiles" DROP CONSTRAINT "FK_d6d200ca910a2124e36eab1177e"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_profiles" DROP CONSTRAINT "FK_064d129936a1e821d637ee8c88e"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_attempts" DROP CONSTRAINT "FK_9172b980d49d753322ce4eecc1b"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_attempts" DROP CONSTRAINT "FK_b3cfd8fad204570a1d448846892"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_785d7001d101cf06d1147cea3ae"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_2bc6920dce9ce914dd46cabe847"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_7536cba909dd7584a4640cad7d5"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_6514ddf48ea7499c62efa6c0a41"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscriptions" DROP CONSTRAINT "FK_f62e9a735f10ce6006ac230fcf9"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" DROP CONSTRAINT "FK_a5d9d595b71f889104a0e103162"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" DROP CONSTRAINT "FK_68b3182f3f5d4d5a0f41c12139b"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" DROP CONSTRAINT "FK_2c938f18f0fea39b8fc971f03a9"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "transactions" DROP CONSTRAINT "FK_a37b6cb6943f9c6b11dbfe168a0"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_types" DROP CONSTRAINT "FK_dce8e01bcfbfb138108782499f9"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_types" DROP CONSTRAINT "FK_b7274ed14dd16c7eddd10e1d557"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "student_exam_types" DROP CONSTRAINT "FK_7475c7eca5638af23ed43dbe2ec"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "subscription_plans" DROP CONSTRAINT "FK_cafccb3e544becc80d7f2e8ca10"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "plan_prices" DROP CONSTRAINT "FK_eb2f222f91a8e78e9e1d591b0de"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsor_profiles" DROP CONSTRAINT "FK_4a88c1e9189bc4559f85363a21a"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "givebacks" DROP CONSTRAINT "FK_8d08f5e24a828005eea2dbe5902"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsor_student_invites" DROP CONSTRAINT "FK_73a50ba6c8afc656922fe31c9b0"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsor_urls" DROP CONSTRAINT "FK_a35f76693f9e1751dc442720a80"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "donations" DROP CONSTRAINT "FK_6e2eefb71a05427462881769627"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsorships" DROP CONSTRAINT "FK_9a1dcfb4803db5566f968f2bf72"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsorships" DROP CONSTRAINT "FK_821b8a0385a3b6a28c7f84bf6cd"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sponsorships" DROP CONSTRAINT "FK_11300c2ba3817ba2c81eba0b8cc"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_configs" DROP CONSTRAINT "FK_4c8a1e666329466d98884ba0e84"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_type_subjects" DROP CONSTRAINT "FK_9c561cb7cee62e72adc49692d40"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "exam_type_subjects" DROP CONSTRAINT "FK_5f29880ca05563c3251dbd803ab"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "refresh_tokens" DROP CONSTRAINT "FK_610102b60fea1455310ccd299de"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_196f8ddf419a42dae14b14bc0c"`,
+    );
+    await queryRunner.query(`DROP TABLE "affiliate_payouts"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."affiliate_payouts_status_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_ec1b1140bacc6871923daf39fe"`,
+    );
+    await queryRunner.query(`DROP TABLE "affiliate_daily_analytics"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_35e3c6775b915f9b8c96baaf28"`,
+    );
+    await queryRunner.query(`DROP TABLE "platform_daily_analytics"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_6dcc898c1abf4bd0e5abb8e229"`,
+    );
+    await queryRunner.query(`DROP TABLE "student_daily_analytics"`);
+    await queryRunner.query(`DROP TABLE "student_streaks"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_614956a91d200887713256de63"`,
+    );
+    await queryRunner.query(`DROP TABLE "student_subject_analytics"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_4d6d04ed4d25fab71f214490af"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_97bef998b0d463cb053643822a"`,
+    );
+    await queryRunner.query(`DROP TABLE "email_verification_codes"`);
+    await queryRunner.query(`DROP TABLE "onboarding_tokens"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_ab673f0e63eac966762155508e"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_d6a19d4b4f6c62dcd29daa497e"`,
+    );
+    await queryRunner.query(`DROP TABLE "password_reset_tokens"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_8bf526a106ddc82800e9bc59f7"`,
+    );
+    await queryRunner.query(`DROP TABLE "message_flags"`);
+    await queryRunner.query(`DROP TYPE "public"."message_flags_status_enum"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_54b94971ac7cc6af25721f8357"`,
+    );
+    await queryRunner.query(`DROP TABLE "chatrooms"`);
+    await queryRunner.query(`DROP TYPE "public"."chatrooms_type_enum"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_edbdfa54b1fd594945e43ca30f"`,
+    );
+    await queryRunner.query(`DROP TABLE "chat_messages"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."chat_messages_deliverystatus_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_1b117714877b45d9dafe069b76"`,
+    );
+    await queryRunner.query(`DROP TABLE "chatroom_participants"`);
+    await queryRunner.query(`DROP TABLE "user_presence"`);
+    await queryRunner.query(`DROP TABLE "activity_logs"`);
+    await queryRunner.query(`DROP TYPE "public"."activity_logs_severity_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."activity_logs_action_enum"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_ba953fe98c085411bba8535299"`,
+    );
+    await queryRunner.query(`DROP TABLE "notifications"`);
+    await queryRunner.query(`DROP TYPE "public"."notifications_type_enum"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_4cc061875e9eecc311a94b3e43"`,
+    );
+    await queryRunner.query(`DROP TABLE "push_subscriptions"`);
+    await queryRunner.query(`DROP TABLE "flagged_questions"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."flagged_questions_flagtype_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_b701e1866e3f3ede56b4ba8a1c"`,
+    );
+    await queryRunner.query(`DROP TABLE "question_progress"`);
+    await queryRunner.query(`DROP TABLE "questions"`);
+    await queryRunner.query(`DROP TYPE "public"."questions_difficulty_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."questions_category_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."questions_type_enum"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_38b54068d2482668ba8f81a59a"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_1e5f6d28b7a1d488e92861f1ee"`,
+    );
+    await queryRunner.query(`DROP TABLE "topics"`);
+    await queryRunner.query(`DROP TABLE "passages"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_c9529597f1e0426f11b01c2aed"`,
+    );
+    await queryRunner.query(`DROP TABLE "student_exam_type_subjects"`);
+    await queryRunner.query(`DROP TABLE "users"`);
+    await queryRunner.query(`DROP TYPE "public"."users_provider_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."users_role_enum"`);
+    await queryRunner.query(`DROP TABLE "affiliate_profiles"`);
+    await queryRunner.query(`DROP TABLE "commissions"`);
+    await queryRunner.query(`DROP TYPE "public"."commissions_currency_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."commissions_status_enum"`);
+    await queryRunner.query(`DROP TABLE "affiliate_referrals"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."affiliate_referrals_usertype_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_26aa2ff3c3d94673d8870bf767"`,
+    );
+    await queryRunner.query(`DROP TABLE "student_profiles"`);
+    await queryRunner.query(`DROP TABLE "exam_attempts"`);
+    await queryRunner.query(`DROP TYPE "public"."exam_attempts_status_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."exam_attempts_mode_enum"`);
+    await queryRunner.query(`DROP TABLE "exam_types"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_4fe163aa8c4cba2137739ad630"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_eb430a390b1e94d5757d255875"`,
+    );
+    await queryRunner.query(`DROP TABLE "region_currencies"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."region_currencies_paymentprovider_enum"`,
+    );
+    await queryRunner.query(
+      `DROP TYPE "public"."region_currencies_currency_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_f9824a75e1373c0a43c0d8d17c"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_d33f799688d1bd44cf64b8f80f"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_7b5b3ab6292671f4248bd2e0f7"`,
+    );
+    await queryRunner.query(`DROP TABLE "webhook_events"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."webhook_events_eventtype_enum"`,
+    );
+    await queryRunner.query(
+      `DROP TYPE "public"."webhook_events_provider_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_d506aa039b006b68031e0961ad"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_6ccf973355b70645eff37774de"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_4badeb2e2fbc3b527a60aea8e0"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_2eeb6283285e7ffc0afed6606a"`,
+    );
+    await queryRunner.query(`DROP TABLE "subscriptions"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."subscriptions_paymentprovider_enum"`,
+    );
+    await queryRunner.query(`DROP TYPE "public"."subscriptions_currency_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."subscriptions_status_enum"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_740a8adb463a50926709f20a4b"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_a37b6cb6943f9c6b11dbfe168a"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_a5d9d595b71f889104a0e10316"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_68b3182f3f5d4d5a0f41c12139"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_2c938f18f0fea39b8fc971f03a"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_91e31a934485712dd3e06c135b"`,
+    );
+    await queryRunner.query(`DROP TABLE "transactions"`);
+    await queryRunner.query(`DROP TYPE "public"."transactions_status_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."transactions_provider_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."transactions_currency_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."transactions_type_enum"`);
+    await queryRunner.query(`DROP TABLE "student_exam_types"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_561041009b4c715efc7ab7e2ec"`,
+    );
+    await queryRunner.query(`DROP TABLE "subscription_plans"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_216079c4298f848a15e49bd94b"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_9364fb2cc2379230cd250b2bd3"`,
+    );
+    await queryRunner.query(`DROP TABLE "plan_prices"`);
+    await queryRunner.query(`DROP TYPE "public"."plan_prices_currency_enum"`);
+    await queryRunner.query(`DROP TABLE "sponsor_profiles"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."sponsor_profiles_sponsortype_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_8d08f5e24a828005eea2dbe590"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_5d3646ce5aea43ec525cf6f626"`,
+    );
+    await queryRunner.query(`DROP TABLE "givebacks"`);
+    await queryRunner.query(`DROP TYPE "public"."givebacks_status_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."givebacks_currency_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."givebacks_type_enum"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_4225924d7de67849f5d8c980bc"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_73a50ba6c8afc656922fe31c9b"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_eac4f77573ba490f1ecf4a0cf5"`,
+    );
+    await queryRunner.query(`DROP TABLE "sponsor_student_invites"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."sponsor_student_invites_status_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_370519f9fcee6e38d77038c1b3"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_a35f76693f9e1751dc442720a8"`,
+    );
+    await queryRunner.query(`DROP TABLE "sponsor_urls"`);
+    await queryRunner.query(`DROP TABLE "donations"`);
+    await queryRunner.query(`DROP TYPE "public"."donations_type_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."donations_currency_enum"`);
+    await queryRunner.query(`DROP TABLE "sponsorships"`);
+    await queryRunner.query(`DROP TYPE "public"."sponsorships_status_enum"`);
+    await queryRunner.query(`DROP TABLE "exam_configs"`);
+    await queryRunner.query(`DROP TYPE "public"."exam_configs_mode_enum"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_cfadd3f990aa88cc96162ec4d2"`,
+    );
+    await queryRunner.query(`DROP TABLE "exam_type_subjects"`);
+    await queryRunner.query(`DROP TABLE "subjects"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_4542dd2f38a61354a040ba9fd5"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_610102b60fea1455310ccd299d"`,
+    );
+    await queryRunner.query(`DROP TABLE "refresh_tokens"`);
+    await queryRunner.query(`DROP TABLE "countries"`);
+    await queryRunner.query(`DROP TABLE "migration_history"`);
+  }
 }
