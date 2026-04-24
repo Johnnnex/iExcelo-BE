@@ -96,5 +96,5 @@ jobs:
             --cpu=1 \
             --memory=512Mi \
             --timeout=60 \
-            --set-env-vars="NODE_ENV=production,PORT=3000,DATABASE_PORT=5432,SMTP_HOST=smtp-relay.brevo.com,SMTP_PORT=587,SMTP_FROM_NAME=iExcelo" \
+            --set-env-vars="NODE_ENV=production,DATABASE_PORT=5432,SMTP_HOST=smtp-relay.brevo.com,SMTP_PORT=587,SMTP_FROM_NAME=iExcelo" \
             --set-secrets="JWT_SECRET=iexcelo-jwt-secret:latest,SMTP_USER=iexcelo-smtp-user:latest,R2_BUCKET_NAME=iexcelo-r2-bucket-name:latest,SMTP_FROM=iexcelo-smtp-from:latest,DATABASE_USER=iexcelo-db-user:latest,DATABASE_NAME=iexcelo-db-name:latest,DATABASE_HOST=iexcelo-db-host:latest,DATABASE_PASSWORD=iexcelo-db-password:latest,SMTP_PASS=iexcelo-smtp-pass:latest,PAYSTACK_SECRET_KEY=iexcelo-paystack-secret:latest,CLOUDFLARE_ACCOUNT_ID=iexcelo-cf-account-id:latest,R2_ACCESS_KEY_ID=iexcelo-r2-access-key-id:latest,R2_SECRET_ACCESS_KEY=iexcelo-r2-secret-access-key:latest,R2_PUBLIC_URL=iexcelo-r2-public-url:latest,VAPID_PUBLIC_KEY=iexcelo-vapid-public-key:latest,VAPID_PRIVATE_KEY=iexcelo-vapid-private-key:latest,REDIS_HOST=iexcelo-redis-host:latest,REDIS_PASSWORD=iexcelo-redis-password:latest,FRONTEND_URL=iexcelo-frontend-url:latest,GOOGLE_CLIENT_ID=iexcelo-google-client-id:latest,GOOGLE_CLIENT_SECRET=iexcelo-google-client-secret:latest,GOOGLE_CALLBACK_URL=iexcelo-google-callback-url:latest"
