@@ -3,7 +3,7 @@
  * This is separate from the NestJS app DataSource — it is only used by the TypeORM CLI.
  *
  * Usage:
- *   npm run migration:generate -- src/database/typeorm-migrations/AddMyColumn
+//  *   npm run migration:generate -- src/database/migrations/typeorm/AddMyColumn
  *   npm run migration:run
  *   npm run migration:revert
  */
