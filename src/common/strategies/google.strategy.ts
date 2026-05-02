@@ -29,7 +29,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     _refreshToken: string,
     profile: {
       id: string;
-      name: { givenName: string; familyName: string };
+      name: { givenName: string; familyName?: string };
       emails: [{ value: string }];
     },
     done: VerifyCallback,
@@ -40,7 +40,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       googleId: id,
       email: emails[0].value,
       firstName: name.givenName,
-      lastName: name.familyName,
+      lastName: name.familyName ?? null,
     };
 
     // Unified flow: always create user if not exists, redirect to onboarding if needed
