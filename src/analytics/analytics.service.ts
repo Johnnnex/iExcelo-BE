@@ -5,45 +5,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { DAY_MS } from '../common/constants';
+import { getLocalDateParts, formatUTCDate } from '../common/utils/date';
 import { StudentSubjectAnalytics } from './entities/student-subject-analytics.entity';
 import { StudentDailyAnalytics } from './entities/student-daily-analytics.entity';
 import { StudentStreak } from './entities/student-streak.entity';
 import { PlatformDailyAnalytics } from './entities/platform-daily-analytics.entity';
 import { AffiliateDailyAnalytics } from './entities/affiliate-daily-analytics.entity';
-
-/**
- * Get the calendar date parts (year, month-0indexed, day, day-of-week)
- * for `now` expressed in the given IANA timezone.
- */
-function getLocalDateParts(
-  now: Date,
-  timezone: string,
-): { year: number; month: number; day: number; dow: number } {
-  let fmt: Intl.DateTimeFormat;
-  try {
-    fmt = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  } catch {
-    fmt = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'UTC',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  }
-  const parts = Object.fromEntries(
-    fmt.formatToParts(now).map((p) => [p.type, p.value]),
-  );
-  const year = parseInt(parts.year, 10);
-  const month = parseInt(parts.month, 10) - 1; // 0-indexed
-  const day = parseInt(parts.day, 10);
-  const dow = new Date(Date.UTC(year, month, day)).getUTCDay(); // 0=Sun
-  return { year, month, day, dow };
-}
 
 @Injectable()
 export class AnalyticsService {
@@ -91,9 +58,6 @@ export class AnalyticsService {
       day: localDay,
       dow: localDow,
     } = getLocalDateParts(now, timezone);
-
-    const fmtDay = (d: Date) =>
-      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 
     // ── 1. Query window with ±2-day buffer ───────────────────────────────────
     // Calendar windows per CHART_DATA_RULES:
@@ -159,7 +123,7 @@ export class AnalyticsService {
           day: '2-digit',
         }).format(d);
       } catch {
-        return fmtDay(d);
+        return formatUTCDate(d);
       }
     };
 
@@ -189,7 +153,7 @@ export class AnalyticsService {
         const [dy, dm, dd] = dayKey.split('-').map(Number);
         const d = new Date(Date.UTC(dy, dm - 1, dd));
         const sun = new Date(Date.UTC(dy, dm - 1, dd - d.getUTCDay()));
-        const wk = fmtDay(sun);
+        const wk = formatUTCDate(sun);
         if (!bucketMap.has(wk)) bucketMap.set(wk, new Map());
         const wkMap = bucketMap.get(wk)!;
         for (const [subjectName, stats] of subjectStats) {
@@ -244,7 +208,7 @@ export class AnalyticsService {
         Date.UTC(localYear, localMonth, localDay - localDow),
       );
       while (cur <= today) {
-        const key = fmtDay(cur);
+        const key = formatUTCDate(cur);
         result.push(buildPoint(key, key));
         cur.setUTCDate(cur.getUTCDate() + 1);
       }
@@ -254,7 +218,7 @@ export class AnalyticsService {
       const firstDow = monthFirst.getUTCDay();
       const cur = new Date(monthFirst.getTime() - firstDow * DAY_MS);
       while (cur <= today) {
-        const key = fmtDay(cur);
+        const key = formatUTCDate(cur);
         result.push(buildPoint(key, key));
         cur.setUTCDate(cur.getUTCDate() + 7);
       }
@@ -440,9 +404,6 @@ export class AnalyticsService {
     } = getLocalDateParts(now, timezone);
     const today = new Date(Date.UTC(localYear, localMonth, localDay));
 
-    const fmtDay = (d: Date) =>
-      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-
     // Resolve start/end dates (fake UTC)
     const rangeStart = startDate
       ? new Date(startDate + 'T00:00:00Z')
@@ -494,7 +455,7 @@ export class AnalyticsService {
           day: '2-digit',
         }).format(d);
       } catch {
-        return fmtDay(d);
+        return formatUTCDate(d);
       }
     };
 
@@ -525,7 +486,7 @@ export class AnalyticsService {
         const [dy, dm, dd] = dayKey.split('-').map(Number);
         const d = new Date(Date.UTC(dy, dm - 1, dd));
         const sun = new Date(Date.UTC(dy, dm - 1, dd - d.getUTCDay()));
-        const wk = fmtDay(sun);
+        const wk = formatUTCDate(sun);
         if (!bucketMap.has(wk)) bucketMap.set(wk, new Map());
         const wkMap = bucketMap.get(wk)!;
         for (const [subjectName, stats] of subjectStats) {
@@ -577,7 +538,7 @@ export class AnalyticsService {
     if (granularity === 'day') {
       const cur = new Date(rangeStart);
       while (cur <= rangeEnd) {
-        const key = fmtDay(cur);
+        const key = formatUTCDate(cur);
         result.push(buildPoint(key, key));
         cur.setUTCDate(cur.getUTCDate() + 1);
       }
@@ -586,7 +547,7 @@ export class AnalyticsService {
       const dow = rangeStart.getUTCDay();
       const cur = new Date(rangeStart.getTime() - dow * DAY_MS);
       while (cur <= rangeEnd) {
-        const key = fmtDay(cur);
+        const key = formatUTCDate(cur);
         result.push(buildPoint(key, key));
         cur.setUTCDate(cur.getUTCDate() + 7);
       }
@@ -635,9 +596,6 @@ export class AnalyticsService {
     } = getLocalDateParts(new Date(), timezone);
     const today = new Date(Date.UTC(localYear, localMonth, localDay));
 
-    const fmtDay = (d: Date) =>
-      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-
     // ── 1. Calendar query window ─────────────────────────────────────────────
     let queryStart: Date;
     const queryEnd = new Date(today.getTime() + 2 * DAY_MS);
@@ -682,7 +640,7 @@ export class AnalyticsService {
           day: '2-digit',
         }).format(d);
       } catch {
-        dayKey = fmtDay(d);
+        dayKey = formatUTCDate(d);
       }
       const prev = dataMap.get(dayKey) ?? { correct: 0, attempted: 0 };
       prev.correct += r.questionsCorrect ?? 0;
@@ -702,7 +660,7 @@ export class AnalyticsService {
         attempted = 0;
       const sunDate = new Date(sunKey + 'T12:00:00Z');
       for (let i = 0; i < 7; i++) {
-        const k = fmtDay(new Date(sunDate.getTime() + i * DAY_MS));
+        const k = formatUTCDate(new Date(sunDate.getTime() + i * DAY_MS));
         const s = dataMap.get(k);
         if (s) {
           correct += s.correct;
@@ -744,8 +702,8 @@ export class AnalyticsService {
       const cur = new Date(monthStart.getTime() - firstDow * DAY_MS);
       while (cur <= today) {
         result.push({
-          period: fmtDay(cur),
-          accuracy: weekAccuracy(fmtDay(cur)),
+          period: formatUTCDate(cur),
+          accuracy: weekAccuracy(formatUTCDate(cur)),
         });
         cur.setUTCDate(cur.getUTCDate() + 7);
       }
@@ -755,7 +713,7 @@ export class AnalyticsService {
         Date.UTC(localYear, localMonth, localDay - localDow),
       );
       while (cur <= today) {
-        const key = fmtDay(cur);
+        const key = formatUTCDate(cur);
         result.push({ period: key, accuracy: dayAccuracy(key) });
         cur.setUTCDate(cur.getUTCDate() + 1);
       }

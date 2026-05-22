@@ -31,6 +31,10 @@ export class ExamType extends BaseEntity {
   @Column({ default: true })
   isActive: boolean;
 
+  // Subject IDs (ExamTypeSubject UUIDs) that require practical sessions for this exam type
+  @Column({ type: 'json', default: () => "'[]'" })
+  practicalSubjectIds: string[];
+
   // ─── Relations ─────────────────────────────────────────────────────────
 
   @OneToMany(() => ExamTypeSubject, (ets) => ets.examType)

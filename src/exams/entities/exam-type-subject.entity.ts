@@ -33,6 +33,9 @@ export class ExamTypeSubject extends BaseEntity {
   @Column()
   subjectId: string;
 
+  @Column({ default: false })
+  isCompulsory: boolean;
+
   // ─── Relations ─────────────────────────────────────────────────────────
 
   @ManyToOne(() => ExamType, (et) => et.examTypeSubjects, {

@@ -577,6 +577,18 @@ export class StudentsService {
       );
     }
 
+    // Validate all compulsory subjects are included
+    const compulsorySubjectIds =
+      await this.examsService.getCompulsorySubjectIds(examTypeId);
+    const missingCompulsory = compulsorySubjectIds.filter(
+      (id) => !subjectIds.includes(id),
+    );
+    if (missingCompulsory.length > 0) {
+      throw new BadRequestException(
+        'Compulsory subjects cannot be removed from your selection',
+      );
+    }
+
     // Remove existing subjects for this exam type
     await this.studentExamTypeSubjectRepo.delete({
       studentExamTypeId: studentExamType.id,

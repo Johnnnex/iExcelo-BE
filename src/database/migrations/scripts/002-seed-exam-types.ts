@@ -26,10 +26,19 @@ export const migration002: IMigration = {
     for (const data of examTypesData) {
       let et = await examTypeRepo.findOne({ where: { name: data.name } });
       if (!et) {
-        et = await examTypeRepo.save(examTypeRepo.create(data));
+        et = await examTypeRepo.save(
+          examTypeRepo.create({
+            name: data.name,
+            description: data.description,
+            minSubjectsSelectable: data.minSubjectsSelectable,
+            maxSubjectsSelectable: data.maxSubjectsSelectable,
+            freeTierQuestionLimit: data.freeTierQuestionLimit,
+            supportedCategories: data.supportedCategories,
+            isActive: data.isActive,
+          }),
+        );
         console.log(`      + ExamType: ${data.name}`);
       } else {
-        // Keep metadata in sync
         await examTypeRepo.update(et.id, {
           freeTierQuestionLimit: data.freeTierQuestionLimit,
           supportedCategories: data.supportedCategories,
@@ -42,14 +51,11 @@ export const migration002: IMigration = {
 
     // ── 2. Subjects + ExamTypeSubjects ─────────────────────────────────────
     console.log('    Seeding subjects...');
-    // "JAMB::Mathematics" → subjectId
-    const subjectIdMap = new Map<string, string>();
 
     for (const data of subjectsData) {
       const examType = examTypeMap.get(data.examTypeName);
       if (!examType) continue;
 
-      // Check if ExamTypeSubject already exists for this (examType, subjectName) pair
       const existingEts = await etsRepo
         .createQueryBuilder('ets')
         .innerJoin('ets.subject', 's')
@@ -58,10 +64,10 @@ export const migration002: IMigration = {
         .getOne();
 
       if (existingEts) {
-        subjectIdMap.set(
-          `${data.examTypeName}::${data.name}`,
-          existingEts.subjectId,
-        );
+        // Keep isCompulsory in sync on re-runs
+        if (existingEts.isCompulsory !== data.isCompulsory) {
+          await etsRepo.update(existingEts.id, { isCompulsory: data.isCompulsory });
+        }
         continue;
       }
 
@@ -69,13 +75,36 @@ export const migration002: IMigration = {
         subjectRepo.create({ name: data.name, description: data.description }),
       );
       await etsRepo.save(
-        etsRepo.create({ examTypeId: examType.id, subjectId: subject.id }),
+        etsRepo.create({
+          examTypeId: examType.id,
+          subjectId: subject.id,
+          isCompulsory: data.isCompulsory,
+        }),
       );
-      subjectIdMap.set(`${data.examTypeName}::${data.name}`, subject.id);
       console.log(`      + Subject: ${data.examTypeName} / ${data.name}`);
     }
 
-    // ── 3. ExamConfigs ─────────────────────────────────────────────────────
+    // ── 3. Resolve practicalSubjectIds per ExamType ────────────────────────
+    console.log('    Resolving practical subject IDs...');
+    for (const data of examTypesData) {
+      const examType = examTypeMap.get(data.name);
+      if (!examType || data.practicalSubjectNames.length === 0) continue;
+
+      const practicalEts = await etsRepo
+        .createQueryBuilder('ets')
+        .innerJoin('ets.subject', 's')
+        .where('ets.examTypeId = :etId', { etId: examType.id })
+        .andWhere('s.name IN (:...names)', { names: data.practicalSubjectNames })
+        .getMany();
+
+      const practicalSubjectIds = practicalEts.map((e) => e.id);
+      await examTypeRepo.update(examType.id, { practicalSubjectIds });
+      console.log(
+        `      ${data.name}: ${practicalSubjectIds.length} practical subject(s)`,
+      );
+    }
+
+    // ── 4. ExamConfigs ─────────────────────────────────────────────────────
     console.log('    Seeding exam configs...');
     for (const seed of examConfigsSeedData) {
       const examType = examTypeMap.get(seed.examTypeName);

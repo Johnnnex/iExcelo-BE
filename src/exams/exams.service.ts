@@ -40,6 +40,7 @@ import {
   ExamTypes,
   LogActionTypes,
   LogSeverity,
+  QuestionCategory,
   QuestionFilter,
   QuestionType,
   SubjectGradeStats,
@@ -125,12 +126,13 @@ export class ExamsService {
       );
     }
 
-    // 4. Resolve selectedSubjectIds → ExamTypeSubject records
-    const etsRecords = await this.examTypeSubjectRepo.find({
+    // 4. Resolve selectedSubjectIds → ExamTypeSubject records (load subject for quota overrides)
+    let etsRecords = await this.examTypeSubjectRepo.find({
       where: {
         examTypeId: dto.examTypeId,
         subjectId: In(dto.selectedSubjectIds),
       },
+      relations: ['subject'],
     });
 
     if (etsRecords.length === 0) {
@@ -150,6 +152,18 @@ export class ExamsService {
         (subjectOrderMap.get(a.subjectId) ?? 0) -
         (subjectOrderMap.get(b.subjectId) ?? 0),
     );
+
+    // For practical category, restrict to subjects listed in practicalSubjectIds
+    if (dto.category === QuestionCategory.PRACTICAL) {
+      const practicalIds: string[] =
+        studentExamType.examType.practicalSubjectIds ?? [];
+      etsRecords = etsRecords.filter((ets) => practicalIds.includes(ets.id));
+      if (etsRecords.length === 0) {
+        throw new BadRequestException(
+          'None of your selected subjects have practical questions for this exam type',
+        );
+      }
+    }
 
     // 5. Fetch questions
     const isPaid = studentExamType.isPaid;
@@ -171,6 +185,21 @@ export class ExamsService {
       ? (dto.questionCount ?? mockConfig?.standardQuestionCount ?? freeLimit)
       : Math.min(dto.questionCount ?? freeLimit, freeLimit);
 
+    // For mock mode with per-subject overrides, build a quota map keyed by ets.id
+    let subjectQuotaMap: Map<string, number> | undefined;
+    if (dto.mode === ExamTypes.MOCK && mockConfig?.rules?.perSubjectOverrides) {
+      const overrides = mockConfig.rules.perSubjectOverrides as Record<string, number>;
+      const basePerSubject =
+        (mockConfig.rules.perSubjectCount as number | undefined) ??
+        Math.floor(effectiveCount / etsRecords.length);
+      subjectQuotaMap = new Map(
+        etsRecords.map((ets) => [
+          ets.id,
+          overrides[ets.subject?.name ?? ''] ?? basePerSubject,
+        ]),
+      );
+    }
+
     const questions = isPaid
       ? await this.getPaidQuestions(
           etsRecords,
@@ -179,6 +208,7 @@ export class ExamsService {
           dto.questionFilter ?? QuestionFilter.MIXED,
           student.id,
           dto.selectedTopicIds,
+          subjectQuotaMap,
         )
       : await this.getFreeTierQuestions(
           etsRecords,
@@ -554,6 +584,7 @@ export class ExamsService {
     filter: QuestionFilter = QuestionFilter.MIXED,
     studentId?: string,
     selectedTopicIds?: string[],
+    subjectQuotaMap?: Map<string, number>,
   ): Promise<Question[]> {
     const n = etsRecords.length;
     const basePerSubject = Math.floor(total / n);
@@ -561,7 +592,9 @@ export class ExamsService {
 
     const perSubject = await Promise.all(
       etsRecords.map(async (ets, idx) => {
-        const quota = basePerSubject + (idx < remainder ? 1 : 0);
+        const quota =
+          subjectQuotaMap?.get(ets.id) ??
+          basePerSubject + (idx < remainder ? 1 : 0);
         if (quota === 0) return [];
 
         if (selectedTopicIds && selectedTopicIds.length > 0) {
@@ -1237,6 +1270,15 @@ export class ExamsService {
       where: { id: In(subjectIds) },
       relations: ['examTypeSubjects'],
     });
+  }
+
+  /** Return subject IDs of all compulsory ExamTypeSubjects for a given exam type. */
+  async getCompulsorySubjectIds(examTypeId: string): Promise<string[]> {
+    const compulsory = await this.examTypeSubjectRepo.find({
+      where: { examTypeId, isCompulsory: true },
+      select: ['subjectId'],
+    });
+    return compulsory.map((ets) => ets.subjectId);
   }
 
   /** Find subjects by IDs, returning only id and name. */

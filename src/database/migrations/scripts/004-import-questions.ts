@@ -91,6 +91,18 @@ function buildTurndown(): TurndownService {
     replacement: (content: string) => content,
   });
 
+  // Superscripts: x<sup>2</sup> → x^{2}
+  td.addRule('superscript', {
+    filter: 'sup',
+    replacement: (content: string) => `^{${content}}`,
+  });
+
+  // Subscripts: H<sub>2</sub>O → H_{2}O
+  td.addRule('subscript', {
+    filter: 'sub',
+    replacement: (content: string) => `_{${content}}`,
+  });
+
   return td;
 }
 
@@ -147,7 +159,7 @@ interface LegacyTopic {
 export const migration004: IMigration = {
   name: '004-import-questions',
   description:
-    'Imports 15,579 legacy questions from "Previous Site Data.json" (HTML→Markdown)',
+    'Imports 15,579 legacy questions from "Previous Site Data.transformed.json" (HTML→Markdown)',
 
   async run(dataSource: DataSource): Promise<void> {
     // ── Ensure legacyId column exists (safe to re-run) ─────────────────────
@@ -156,16 +168,16 @@ export const migration004: IMigration = {
     );
 
     // ── Load legacy JSON ───────────────────────────────────────────────────
-    // File lives at project root: iExcelo/Previous Site Data.json
+    // File lives at project root: iExcelo/Previous Site Data.transformed.json
     // This script is at: iExcelo/Backend/src/database/migrations/scripts/
     const jsonPath = path.resolve(
       __dirname,
-      '../../../../../Previous Site Data.json',
+      '../../../../../Previous Site Data.transformed.json',
     );
     if (!fs.existsSync(jsonPath)) {
       throw new Error(
         `Legacy data file not found at: ${jsonPath}\n` +
-          `  Expected: iExcelo/Previous Site Data.json`,
+          `  Expected: iExcelo/Previous Site Data.transformed.json`,
       );
     }
 
@@ -324,6 +336,12 @@ export const migration004: IMigration = {
           text: htmlToMd(o.questions_options),
           isCorrect: o.answer === '1',
         }));
+        // Skip questions where every option has blank content (biology/economics etc.)
+        const hasContent = options.some((o) => o.text.trim().length > 0);
+        if (!hasContent) {
+          noOptions++;
+          continue;
+        }
         const correctIds = options.filter((o) => o.isCorrect).map((o) => o.id);
         correctAnswer =
           correctIds.length === 1
@@ -356,7 +374,10 @@ export const migration004: IMigration = {
         type,
         category,
         correctAnswer: correctAnswer ?? undefined,
-        explanationShort: htmlToMd(legQ.answer_description) || undefined,
+        explanationShort: legQ.answer_description
+          ? htmlToMd(legQ.answer_description).slice(0, 200) || undefined
+          : undefined,
+        explanationLong: htmlToMd(legQ.answer_description) || undefined,
         difficulty: 'medium',
         marks: 1,
         isActive: true,

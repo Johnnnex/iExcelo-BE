@@ -25,10 +25,11 @@ export const examConfigsSeedData: ExamConfigSeed[] = [
     examTypeName: 'JAMB',
     mode: ExamConfigModes.MOCK,
     standardDurationMinutes: 120,
-    standardQuestionCount: 100,
+    standardQuestionCount: 180,
     rules: {
       subjectsRequired: 4,
-      perSubjectCount: 25,
+      perSubjectCount: 40,
+      perSubjectOverrides: { 'English Language': 60 },
     },
   },
   {
