@@ -66,7 +66,9 @@ export const migration002: IMigration = {
       if (existingEts) {
         // Keep isCompulsory in sync on re-runs
         if (existingEts.isCompulsory !== data.isCompulsory) {
-          await etsRepo.update(existingEts.id, { isCompulsory: data.isCompulsory });
+          await etsRepo.update(existingEts.id, {
+            isCompulsory: data.isCompulsory,
+          });
         }
         continue;
       }
@@ -94,7 +96,9 @@ export const migration002: IMigration = {
         .createQueryBuilder('ets')
         .innerJoin('ets.subject', 's')
         .where('ets.examTypeId = :etId', { etId: examType.id })
-        .andWhere('s.name IN (:...names)', { names: data.practicalSubjectNames })
+        .andWhere('s.name IN (:...names)', {
+          names: data.practicalSubjectNames,
+        })
         .getMany();
 
       const practicalSubjectIds = practicalEts.map((e) => e.id);

@@ -187,10 +187,15 @@ export class ExamsService {
 
     // For mock mode with per-subject overrides, build a quota map keyed by ets.id
     let subjectQuotaMap: Map<string, number> | undefined;
-    if (dto.mode === ExamTypes.MOCK && mockConfig?.rules?.perSubjectOverrides) {
-      const overrides = mockConfig.rules.perSubjectOverrides as Record<string, number>;
+    interface MockRules {
+      perSubjectOverrides?: Record<string, number>;
+      perSubjectCount?: number;
+    }
+    const mockRules = mockConfig?.rules as MockRules | undefined;
+    if (dto.mode === ExamTypes.MOCK && mockRules?.perSubjectOverrides) {
+      const overrides = mockRules.perSubjectOverrides;
       const basePerSubject =
-        (mockConfig.rules.perSubjectCount as number | undefined) ??
+        mockRules.perSubjectCount ??
         Math.floor(effectiveCount / etsRecords.length);
       subjectQuotaMap = new Map(
         etsRecords.map((ets) => [

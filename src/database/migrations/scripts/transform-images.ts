@@ -16,7 +16,11 @@ import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
 import * as crypto from 'crypto';
-import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  HeadObjectCommand,
+} from '@aws-sdk/client-s3';
 import * as dotenv from 'dotenv';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
@@ -66,7 +70,11 @@ function mimeFromFilename(filename: string): string {
 
 // Deterministic R2 key: 8-char hash prefix + sanitized filename
 function r2Key(rawFilename: string): string {
-  const hash = crypto.createHash('sha256').update(rawFilename).digest('hex').slice(0, 8);
+  const hash = crypto
+    .createHash('sha256')
+    .update(rawFilename)
+    .digest('hex')
+    .slice(0, 8);
   const safe = rawFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
   return `${R2_FOLDER}/${hash}-${safe}`;
 }
@@ -76,8 +84,16 @@ function download(url: string, redirectsLeft = 5): Promise<Buffer | null> {
   return new Promise((resolve) => {
     const mod = url.startsWith('https') ? https : http;
     const req = mod.get(url, { timeout: 20000 }, (res) => {
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        if (redirectsLeft <= 0) { resolve(null); return; }
+      if (
+        res.statusCode &&
+        res.statusCode >= 300 &&
+        res.statusCode < 400 &&
+        res.headers.location
+      ) {
+        if (redirectsLeft <= 0) {
+          resolve(null);
+          return;
+        }
         const redirectUrl = res.headers.location.startsWith('http')
           ? res.headers.location
           : new URL(res.headers.location, url).href;
@@ -95,7 +111,10 @@ function download(url: string, redirectsLeft = 5): Promise<Buffer | null> {
       res.on('error', () => resolve(null));
     });
     req.on('error', () => resolve(null));
-    req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
   });
 }
 
@@ -109,13 +128,19 @@ async function r2Exists(key: string): Promise<boolean> {
   }
 }
 
-async function uploadToR2(buffer: Buffer, filename: string, key: string): Promise<string> {
-  await s3.send(new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-    Body: buffer,
-    ContentType: mimeFromFilename(filename),
-  }));
+async function uploadToR2(
+  buffer: Buffer,
+  filename: string,
+  key: string,
+): Promise<string> {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeFromFilename(filename),
+    }),
+  );
   return `${PUBLIC_URL}/${key}`;
 }
 
@@ -132,17 +157,26 @@ function extractSrcs(html: string): string[] {
 
 // Replace src="../uploads/..." with src="R2_URL" using the url map
 function rewriteHtml(html: string, urlMap: Map<string, string>): string {
-  return html.replace(/src="(\.\.\/uploads\/[^"]+)"/g, (_match, src: string) => {
-    const r2url = urlMap.get(src);
-    return r2url ? `src="${r2url}"` : `src="${src}"`;
-  });
+  return html.replace(
+    /src="(\.\.\/uploads\/[^"]+)"/g,
+    (_match, src: string) => {
+      const r2url = urlMap.get(src);
+      return r2url ? `src="${r2url}"` : `src="${src}"`;
+    },
+  );
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const jsonPath = path.resolve(__dirname, '../../../../../Previous Site Data.json');
-  const outPath = path.resolve(__dirname, '../../../../../Previous Site Data.transformed.json');
+  const jsonPath = path.resolve(
+    __dirname,
+    '../../../../../Previous Site Data.json',
+  );
+  const outPath = path.resolve(
+    __dirname,
+    '../../../../../Previous Site Data.transformed.json',
+  );
 
   if (!fs.existsSync(jsonPath)) {
     console.error(`❌ Not found: ${jsonPath}`);
@@ -173,7 +207,7 @@ async function main() {
     const rows = tableMap.get(name) ?? [];
     for (const row of rows) {
       for (const field of fields) {
-        const val = row[field];
+        const val: unknown = (row as Record<string, unknown>)[field];
         if (typeof val === 'string' && val.includes(UPLOADS_PREFIX)) {
           for (const src of extractSrcs(val)) allSrcs.add(src);
         }
@@ -181,7 +215,9 @@ async function main() {
     }
   }
 
-  console.log(`🖼  Found ${allSrcs.size} unique ../uploads/ image references\n`);
+  console.log(
+    `🖼  Found ${allSrcs.size} unique ../uploads/ image references\n`,
+  );
 
   // Download each image and upload to R2
   const urlMap = new Map<string, string>(); // raw src → R2 public URL
@@ -200,12 +236,17 @@ async function main() {
     if (exists) {
       urlMap.set(src, `${PUBLIC_URL}/${key}`);
       alreadyExisted++;
-      process.stdout.write(`  ⏭  Already on R2: ${rawFilename.slice(0, 50)}\n`);
+      process.stdout.write(
+        `  ⏭  Already on R2: ${rawFilename.slice(0, 50)}\n`,
+      );
       continue;
     }
 
     // Build download URL — encode the filename for the HTTP request
-    const encodedFilename = rawFilename.split('/').map(encodeURIComponent).join('/');
+    const encodedFilename = rawFilename
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/');
     const downloadUrl = `${OLD_BASE_URL}/uploads/${encodedFilename}`;
 
     process.stdout.write(`  ⬇  ${rawFilename.slice(0, 55).padEnd(55)} `);
@@ -223,8 +264,9 @@ async function main() {
       urlMap.set(src, r2url);
       process.stdout.write(`✅ ${buffer.length} bytes → R2\n`);
       uploaded++;
-    } catch (err: any) {
-      process.stdout.write(`❌ R2 error: ${err.message}\n`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stdout.write(`❌ R2 error: ${msg}\n`);
       failed++;
       failedList.push(rawFilename);
     }
@@ -247,12 +289,13 @@ async function main() {
   for (const { name, fields } of targets) {
     const rows = tableMap.get(name) ?? [];
     for (const row of rows) {
+      const typedRow = row as Record<string, unknown>;
       for (const field of fields) {
-        const val = row[field];
+        const val: unknown = typedRow[field];
         if (typeof val === 'string' && val.includes(UPLOADS_PREFIX)) {
           const rewritten = rewriteHtml(val, urlMap);
           if (rewritten !== val) {
-            row[field] = rewritten;
+            typedRow[field] = rewritten;
             rewrittenFields++;
           }
         }
@@ -269,7 +312,9 @@ async function main() {
 
   console.log(`\n✅ Done!`);
   console.log(`   ${uploaded + alreadyExisted} images on R2`);
-  console.log(`   ${failed} images failed (these questions will have broken images)`);
+  console.log(
+    `   ${failed} images failed (these questions will have broken images)`,
+  );
   console.log(`   Output: ${outPath}`);
 }
 
