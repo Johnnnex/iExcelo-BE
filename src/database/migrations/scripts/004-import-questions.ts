@@ -374,10 +374,7 @@ export const migration004: IMigration = {
         type,
         category,
         correctAnswer: correctAnswer ?? undefined,
-        explanationShort: legQ.answer_description
-          ? htmlToMd(legQ.answer_description).slice(0, 200) || undefined
-          : undefined,
-        explanationLong: htmlToMd(legQ.answer_description) || undefined,
+        explanation: htmlToMd(legQ.answer_description) || undefined,
         difficulty: 'medium',
         marks: 1,
         isActive: true,

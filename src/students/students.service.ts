@@ -807,8 +807,7 @@ export class StudentsService {
           questionType: q.type,
           topicId: q.topicId ?? null,
           topicName: q.topic?.name ?? null,
-          explanationShort: q.explanationShort ?? null,
-          explanationLong: q.explanationLong ?? null,
+          explanation: q.explanation ?? null,
           marks: q.marks,
           passageId: q.passageId ?? null,
           passage: q.passage

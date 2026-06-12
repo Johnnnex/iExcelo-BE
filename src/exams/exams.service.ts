@@ -980,8 +980,7 @@ export class ExamsService {
         correctAnswer: q.correctAnswer,
         topicId: q.topicId ?? null,
         topicName: q.topic?.name ?? null,
-        explanationShort: q.explanationShort ?? null,
-        explanationLong: q.explanationLong ?? null,
+        explanation: q.explanation ?? null,
       }),
     }));
   }
@@ -1223,43 +1222,6 @@ export class ExamsService {
   }
 
   // ─── Admin: Diagnose ──────────────────────────────────────────────────────
-
-  /**
-   * Diagnostic: shows ETS records, question counts per ETS, and orphaned questions.
-   * Orphaned = questions whose examTypeSubjectId doesn't match any current ETS record.
-   * Call GET /exams/admin/diagnose-questions to debug "questions: []" issues.
-   */
-  async diagnoseQuestions() {
-    const allETS = await this.examTypeSubjectRepo.find({
-      relations: ['examType', 'subject'],
-    });
-
-    const etsIds = allETS.map((e) => e.id);
-
-    const perETS = await Promise.all(
-      allETS.map(async (ets) => ({
-        etsId: ets.id,
-        examType: ets.examType?.name ?? '?',
-        subject: ets.subject?.name ?? '?',
-        questionCount: await this.questionRepo.count({
-          where: { examTypeSubjectId: ets.id },
-        }),
-        activeQuestionCount: await this.questionRepo.count({
-          where: { examTypeSubjectId: ets.id, isActive: true },
-        }),
-      })),
-    );
-
-    const orphanedCount =
-      etsIds.length > 0
-        ? await this.questionRepo
-            .createQueryBuilder('q')
-            .where('q.examTypeSubjectId NOT IN (:...etsIds)', { etsIds })
-            .getCount()
-        : await this.questionRepo.count();
-
-    return { ets: perETS, orphanedQuestions: orphanedCount };
-  }
 
   // ─── Methods used by StudentsService (cross-resource delegation) ─────────
 

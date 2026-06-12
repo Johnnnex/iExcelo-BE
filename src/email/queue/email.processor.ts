@@ -10,6 +10,7 @@ import {
   SendOnboardingEmailJobData,
   SendWelcomeEmailJobData,
   SendSponsoredActivationEmailJobData,
+  SendBulkCampaignEmailJobData,
 } from './email.queue';
 
 @Processor(EMAILS_QUEUE)
@@ -41,6 +42,11 @@ export class EmailsProcessor extends WorkerHost {
       case EmailJobs.SEND_SPONSORED_ACTIVATION:
         await this.handleSendSponsoredActivation(
           job as Job<SendSponsoredActivationEmailJobData>,
+        );
+        break;
+      case EmailJobs.SEND_BULK_CAMPAIGN:
+        await this.handleSendBulkCampaign(
+          job as Job<SendBulkCampaignEmailJobData>,
         );
         break;
       default:
@@ -133,6 +139,26 @@ export class EmailsProcessor extends WorkerHost {
     } catch (err: unknown) {
       this.logger.error(
         `Sponsored activation email failed for ${email}: ${(err as Error)?.message}`,
+      );
+      throw err;
+    }
+  }
+
+  private async handleSendBulkCampaign(
+    job: Job<SendBulkCampaignEmailJobData>,
+  ): Promise<void> {
+    const { email, firstName, subject, htmlContent } = job.data;
+    this.logger.log(`Sending bulk campaign email to ${email}`);
+    try {
+      await this.emailService.sendBulkCampaignEmail(
+        email,
+        firstName,
+        subject,
+        htmlContent,
+      );
+    } catch (err: unknown) {
+      this.logger.error(
+        `Bulk campaign email failed for ${email}: ${(err as Error)?.message}`,
       );
       throw err;
     }

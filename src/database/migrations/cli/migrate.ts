@@ -40,6 +40,11 @@ import { AffiliateReferral } from '../../../affiliates/entities/affiliate-referr
 import { Commission } from '../../../affiliates/entities/commission.entity';
 import { ExamAttempt } from '../../../students/entities/exam-attempt.entity';
 import { StudentExamType } from '../../../students/entities/student-exam-type.entity';
+import { AdminProfile } from '../../../admin/entities/admin-profile.entity';
+import { AdminRole } from '../../../admin/entities/admin-role.entity';
+import { AdminInvite } from '../../../admin/entities/admin-invite.entity';
+import { Testimonial } from '../../../admin/entities/testimonial.entity';
+import { BulkEmailCampaign } from '../../../admin/entities/bulk-email-campaign.entity';
 
 // ── Migration scripts ─────────────────────────────────────────────────────────
 import { MigrationRunner } from '../migration-runner';
@@ -47,8 +52,19 @@ import { migration001 } from '../scripts/001-seed-countries';
 import { migration002 } from '../scripts/002-seed-exam-types';
 import { migration003 } from '../scripts/003-seed-subscription-plans';
 import { migration004 } from '../scripts/004-import-questions';
+import { migration005 } from '../scripts/005-seed-superadmin';
+import { migration006 } from '../scripts/006-seed-role-templates';
+import { migration007 } from '../scripts/007-merge-explanation-fields';
 
-const ALL_MIGRATIONS = [migration001, migration002, migration003, migration004];
+const ALL_MIGRATIONS = [
+  migration001,
+  migration002,
+  migration003,
+  migration004,
+  migration005,
+  migration006,
+  migration007,
+];
 
 async function createDataSource(): Promise<DataSource> {
   const ds = new DataSource({
@@ -87,6 +103,11 @@ async function createDataSource(): Promise<DataSource> {
       Transaction,
       SponsorUrl,
       PlanPrice,
+      AdminProfile,
+      AdminRole,
+      AdminInvite,
+      Testimonial,
+      BulkEmailCampaign,
     ],
     synchronize: false,
     ssl:

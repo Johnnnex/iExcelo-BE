@@ -175,18 +175,4 @@ export class ExamsController {
     const topic = await this.examsService.getTopic(topicId);
     return { message: 'Topic retrieved', data: topic };
   }
-
-  // ─── Admin ────────────────────────────────────────────────────────────────
-
-  /**
-   * Diagnostic: shows ETS records, question counts per ETS, and orphaned question count.
-   * Use this to verify examTypeSubjectId integrity when questions return empty on exam start.
-   */
-  @Get('admin/diagnose-questions')
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles(UserType.ADMIN)
-  async diagnoseQuestions() {
-    const result = await this.examsService.diagnoseQuestions();
-    return { message: 'Diagnosis complete', data: result };
-  }
 }

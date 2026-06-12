@@ -20,6 +20,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { UploadModule } from './upload/upload.module';
 import { ChatsModule } from './chats/chats.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     UploadModule,
     ChatsModule,
     NotificationsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

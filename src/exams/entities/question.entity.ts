@@ -57,13 +57,9 @@ export class Question extends BaseEntity {
   @JoinColumn({ name: 'topicId' })
   topic: Topic;
 
-  // Short explanation (1–2 sentences). Markdown + LaTeX.
+  // Explanation (Markdown + LaTeX). Shown after answer is revealed.
   @Column({ type: 'text', nullable: true })
-  explanationShort: string;
-
-  // Full detailed explanation. Markdown + LaTeX. Step-by-step workings.
-  @Column({ type: 'text', nullable: true })
-  explanationLong: string;
+  explanation: string | null;
 
   // Per-type validation config
   @Column({ type: 'json', nullable: true })

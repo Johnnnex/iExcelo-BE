@@ -289,6 +289,75 @@ export class EmailService {
     });
   }
 
+  async sendAdminInviteEmail(
+    email: string,
+    firstName: string,
+    rawToken: string,
+  ) {
+    const adminUrl = this.configService.get(
+      'ADMIN_URL',
+      'http://localhost:5555',
+    );
+    const inviteUrl = `${adminUrl}/accept-invite?token=${rawToken}`;
+
+    await this.transporter.sendMail({
+      from: this.from,
+      to: email,
+      subject: "You've been invited to iExcelo Admin Panel",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #007FFF;">Admin Panel Invitation</h2>
+          <p>Hi ${firstName},</p>
+          <p>You've been invited to join the iExcelo Admin Panel. Click the button below to set up your account.</p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${inviteUrl}" style="background-color: #007FFF; color: white; padding: 14px 28px; text-decoration: none; border-radius: 24px; display: inline-block; font-weight: 600;">
+              Accept Invitation
+            </a>
+          </div>
+
+          <p style="color: #667085; font-size: 14px;">If the button doesn't work, copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #007FFF; font-size: 14px;">${inviteUrl}</p>
+
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #E5E7EB;">
+            <p style="color: #667085; font-size: 14px;">
+              <strong>Security Notice:</strong> This invitation link expires in 7 days.
+            </p>
+          </div>
+
+          <div style="margin-top: 30px; color: #667085; font-size: 12px;">
+            <p>If you weren't expecting this invitation, you can safely ignore it.</p>
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB; text-align: center; color: #667085; font-size: 12px;">
+            <p>© ${new Date().getFullYear()} iExcelo. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    });
+  }
+
+  async sendBulkCampaignEmail(
+    to: string,
+    firstName: string,
+    subject: string,
+    htmlContent: string,
+  ) {
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+        <p>Hi ${firstName},</p>
+        ${htmlContent}
+        <hr style="margin-top:30px;border:none;border-top:1px solid #eee" />
+        <p style="color:#667085;font-size:12px">
+          You're receiving this because you have an account with iExcelo.
+        </p>
+      </div>`,
+    });
+  }
+
   async sendWelcomeEmail(
     email: string,
     firstName: string,

@@ -69,36 +69,6 @@ export class SubscriptionsService {
   ) {}
 
   /**
-   * Force reseed all subscription plans and prices.
-   * Clears existing plans (cascade deletes prices) and recreates from seed data.
-   * Use this when seed data changes or DB is corrupted.
-   */
-  async forceReseedPlans(): Promise<{
-    plansCreated: number;
-    pricesCreated: number;
-  }> {
-    // Clear existing plans (prices cascade delete due to FK)
-    await this.planPriceRepo.createQueryBuilder().delete().execute();
-    await this.planRepo.createQueryBuilder().delete().execute();
-
-    // Also reseed regions
-    await this.regionCurrencyRepo.createQueryBuilder().delete().execute();
-
-    const regions = regionsData.map((region) =>
-      this.regionCurrencyRepo.create({ ...region, isActive: true }),
-    );
-    await this.regionCurrencyRepo.save(regions);
-
-    const defaultRegionEntity = this.regionCurrencyRepo.create({
-      ...defaultRegion,
-      isActive: true,
-    });
-    await this.regionCurrencyRepo.save(defaultRegionEntity);
-
-    return this.createPlansForAllExamTypes();
-  }
-
-  /**
    * Creates subscription plans and prices for all active exam types.
    * Returns count of created records.
    */

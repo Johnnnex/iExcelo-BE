@@ -6,6 +6,7 @@ export const EmailJobs = {
   SEND_ONBOARDING: 'send_onboarding_email',
   SEND_WELCOME: 'send_welcome_email',
   SEND_SPONSORED_ACTIVATION: 'send_sponsored_activation_email',
+  SEND_BULK_CAMPAIGN: 'send_bulk_campaign_email',
 } as const;
 
 export interface SendVerificationEmailJobData {
@@ -37,4 +38,11 @@ export interface SendSponsoredActivationEmailJobData {
   firstName: string;
   rawToken: string;
   sponsorName: string;
+}
+
+export interface SendBulkCampaignEmailJobData {
+  email: string;
+  firstName: string;
+  subject: string;
+  htmlContent: string;
 }

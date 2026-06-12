@@ -685,24 +685,4 @@ export class SubscriptionsController {
       },
     };
   }
-
-  // === ADMIN ROUTES ===
-
-  /**
-   * Force reseed all subscription plans and prices
-   * POST /subscriptions/admin/reseed
-   * Admin only - clears existing plans/prices and recreates from seed data
-   */
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles(UserType.ADMIN)
-  @Post('admin/reseed')
-  async reseedPlans() {
-    const result: { plansCreated: number; pricesCreated: number } =
-      await this.subscriptionsService.forceReseedPlans();
-    return {
-      success: true,
-      message: `Reseeded ${result.plansCreated} plans with ${result.pricesCreated} prices`,
-      data: result,
-    };
-  }
 }

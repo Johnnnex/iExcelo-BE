@@ -47,7 +47,16 @@ export class User extends BaseEntity {
   emailVerified: boolean;
 
   @Column({ default: true })
-  isActive: boolean; // To track other metadata, maybe if an admin decides to ban a user
+  isActive: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  suspendedUntil: Date | null;
+
+  @Column({ default: true })
+  newsletterOptIn: boolean;
+
+  @Column({ default: true })
+  promotionsOptIn: boolean;
 
   @Column({ type: 'timestamp', nullable: true })
   lastLogin: Date;
