@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -39,11 +40,11 @@ export class AdminExamRevisionService {
   async listExamTypes(opts: { page: number; limit: number; search?: string }) {
     const qb = this.examTypeRepo
       .createQueryBuilder('et')
+      .loadRelationCountAndMap('et.etsCount', 'et.examTypeSubjects')
       .orderBy('et.name', 'ASC')
       .skip((opts.page - 1) * opts.limit)
       .take(opts.limit);
-    if (opts.search)
-      qb.where('et.name ILIKE :s', { s: `%${opts.search}%` });
+    if (opts.search) qb.where('et.name ILIKE :s', { s: `%${opts.search}%` });
     const [items, total] = await qb.getManyAndCount();
     return { items, total, page: opts.page, limit: opts.limit };
   }
@@ -81,6 +82,16 @@ export class AdminExamRevisionService {
   ) {
     const et = await this.examTypeRepo.findOne({ where: { id } });
     if (!et) throw new NotFoundException('ExamType not found');
+    if (dto.isActive === false) {
+      const etsCount = await this.examTypeSubjectRepo.count({
+        where: { examTypeId: id },
+      });
+      if (etsCount > 0) {
+        throw new BadRequestException(
+          `Cannot deactivate: ${etsCount} linked subject(s) must be removed first`,
+        );
+      }
+    }
     Object.assign(et, dto);
     return this.examTypeRepo.save(et);
   }
@@ -97,22 +108,28 @@ export class AdminExamRevisionService {
   async listSubjects(opts: { page: number; limit: number; search?: string }) {
     const qb = this.subjectRepo
       .createQueryBuilder('s')
+      .loadRelationCountAndMap('s.etsCount', 's.examTypeSubjects')
       .orderBy('s.name', 'ASC')
       .skip((opts.page - 1) * opts.limit)
       .take(opts.limit);
-    if (opts.search)
-      qb.where('s.name ILIKE :s', { s: `%${opts.search}%` });
+    if (opts.search) qb.where('s.name ILIKE :s', { s: `%${opts.search}%` });
     const [items, total] = await qb.getManyAndCount();
     return { items, total, page: opts.page, limit: opts.limit };
   }
 
-  async createSubject(dto: { name: string; description?: string }) {
+  async createSubject(dto: {
+    name: string;
+    description?: string;
+    isActive?: boolean;
+  }) {
     const existing = await this.subjectRepo
       .createQueryBuilder('s')
       .where('s.name ILIKE :name', { name: dto.name })
       .getOne();
     if (existing) throw new ConflictException('Subject name already exists');
-    return this.subjectRepo.save(this.subjectRepo.create(dto));
+    return this.subjectRepo.save(
+      this.subjectRepo.create({ ...dto, isActive: dto.isActive ?? true }),
+    );
   }
 
   async updateSubject(
@@ -142,6 +159,39 @@ export class AdminExamRevisionService {
     });
   }
 
+  async listAllEts(opts: {
+    page: number;
+    limit: number;
+    search?: string;
+    examTypeId?: string;
+    subjectId?: string;
+  }) {
+    const qb = this.examTypeSubjectRepo
+      .createQueryBuilder('ets')
+      .leftJoinAndSelect('ets.examType', 'examType')
+      .leftJoinAndSelect('ets.subject', 'subject')
+      .loadRelationCountAndMap('ets.questionCount', 'ets.questions')
+      .loadRelationCountAndMap('ets.passageCount', 'ets.passages')
+      .orderBy('examType.name', 'ASC')
+      .addOrderBy('subject.name', 'ASC')
+      .skip((opts.page - 1) * opts.limit)
+      .take(opts.limit);
+
+    if (opts.examTypeId)
+      qb.andWhere('ets.examTypeId = :examTypeId', {
+        examTypeId: opts.examTypeId,
+      });
+    if (opts.subjectId)
+      qb.andWhere('ets.subjectId = :subjectId', { subjectId: opts.subjectId });
+    if (opts.search)
+      qb.andWhere('(examType.name ILIKE :s OR subject.name ILIKE :s)', {
+        s: `%${opts.search}%`,
+      });
+
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, page: opts.page, limit: opts.limit };
+  }
+
   async linkExamTypeSubject(
     examTypeId: string,
     subjectId: string,
@@ -159,9 +209,28 @@ export class AdminExamRevisionService {
     return this.examTypeSubjectRepo.save(link);
   }
 
+  async updateExamTypeSubject(id: string, data: { isCompulsory: boolean }) {
+    const ets = await this.examTypeSubjectRepo.findOne({ where: { id } });
+    if (!ets) throw new NotFoundException('Link not found');
+    ets.isCompulsory = data.isCompulsory;
+    return this.examTypeSubjectRepo.save(ets);
+  }
+
   async unlinkExamTypeSubject(id: string) {
     const link = await this.examTypeSubjectRepo.findOne({ where: { id } });
     if (!link) throw new NotFoundException('Link not found');
+
+    const [questionCount, passageCount] = await Promise.all([
+      this.questionRepo.count({ where: { examTypeSubjectId: id } }),
+      this.passageRepo.count({ where: { examTypeSubjectId: id } }),
+    ]);
+
+    if (questionCount > 0 || passageCount > 0) {
+      throw new BadRequestException(
+        `Cannot unlink: ${questionCount} question(s) and ${passageCount} passage(s) are assigned here. Remove them first.`,
+      );
+    }
+
     await this.examTypeSubjectRepo.remove(link);
     return { message: 'Unlinked' };
   }
@@ -182,8 +251,7 @@ export class AdminExamRevisionService {
       .take(opts.limit);
     if (opts.subjectId)
       qb.andWhere('t.subjectId = :subjectId', { subjectId: opts.subjectId });
-    if (opts.search)
-      qb.andWhere('t.name ILIKE :s', { s: `%${opts.search}%` });
+    if (opts.search) qb.andWhere('t.name ILIKE :s', { s: `%${opts.search}%` });
     const [items, total] = await qb.getManyAndCount();
     return { items, total, page: opts.page, limit: opts.limit };
   }
@@ -229,8 +297,7 @@ export class AdminExamRevisionService {
       qb.andWhere('p.examTypeSubjectId = :etsId', {
         etsId: opts.examTypeSubjectId,
       });
-    if (opts.search)
-      qb.andWhere('p.title ILIKE :s', { s: `%${opts.search}%` });
+    if (opts.search) qb.andWhere('p.title ILIKE :s', { s: `%${opts.search}%` });
     const [items, total] = await qb.getManyAndCount();
     return { items, total, page: opts.page, limit: opts.limit };
   }
@@ -316,7 +383,6 @@ export class AdminExamRevisionService {
     return q;
   }
 
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   createQuestion(dto: {
     examTypeSubjectId: string;
     questionText: string;
@@ -363,7 +429,6 @@ export class AdminExamRevisionService {
     Object.assign(q, dto);
     return this.questionRepo.save(q);
   }
-  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   async deleteQuestion(id: string) {
     const q = await this.questionRepo.findOne({ where: { id } });
@@ -385,8 +450,10 @@ export class AdminExamRevisionService {
           examTypeSubjectId: raw.examTypeSubjectId as string,
           questionText: raw.questionText as string,
           type: raw.type as QuestionType,
-          category: (raw.category ?? QuestionCategory.OBJECTIVES) as QuestionCategory,
-          difficulty: (raw.difficulty ?? QuestionDifficulty.MEDIUM) as QuestionDifficulty,
+          category: (raw.category ??
+            QuestionCategory.OBJECTIVES) as QuestionCategory,
+          difficulty: (raw.difficulty ??
+            QuestionDifficulty.MEDIUM) as QuestionDifficulty,
           marks: (raw.marks as number) ?? 1,
           options: raw.options as Array<{
             id: string;

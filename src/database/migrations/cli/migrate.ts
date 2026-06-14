@@ -54,7 +54,6 @@ import { migration003 } from '../scripts/003-seed-subscription-plans';
 import { migration004 } from '../scripts/004-import-questions';
 import { migration005 } from '../scripts/005-seed-superadmin';
 import { migration006 } from '../scripts/006-seed-role-templates';
-import { migration007 } from '../scripts/007-merge-explanation-fields';
 
 const ALL_MIGRATIONS = [
   migration001,
@@ -63,7 +62,6 @@ const ALL_MIGRATIONS = [
   migration004,
   migration005,
   migration006,
-  migration007,
 ];
 
 async function createDataSource(): Promise<DataSource> {
