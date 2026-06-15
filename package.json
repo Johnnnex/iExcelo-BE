@@ -58,6 +58,7 @@
     "socket.io": "^4.8.3",
     "stripe": "^20.3.1",
     "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2",
     "typeorm": "^0.3.27",
     "web-push": "^3.6.7"
   },

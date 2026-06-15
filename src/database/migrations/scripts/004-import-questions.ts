@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+﻿import * as fs from 'fs';
 import * as path from 'path';
 import { DataSource } from 'typeorm';
 import TurndownService from 'turndown';
@@ -60,6 +60,81 @@ const QUESTION_TYPE_MAP: Record<
   Practical: { type: QuestionType.ESSAY, category: QuestionCategory.PRACTICAL },
 };
 
+// ─── Superscript / subscript → Unicode or KaTeX ──────────────────────────────
+// react-markdown strips raw HTML (no rehype-raw), and bare ^{x}/_{x} are not
+// inside $…$ so KaTeX never sees them. Convert to Unicode where possible; for
+// anything else emit $^{\text{…}}$ / $_{\text{…}}$ which KaTeX renders fine.
+
+const SUPER_MAP: Record<string, string> = {
+  '0': '⁰',
+  '1': '¹',
+  '2': '²',
+  '3': '³',
+  '4': '⁴',
+  '5': '⁵',
+  '6': '⁶',
+  '7': '⁷',
+  '8': '⁸',
+  '9': '⁹',
+  '-': '⁻',
+  '+': '⁺',
+  n: 'ⁿ',
+  '∘': '°',
+  o: '°',
+};
+
+const SUB_MAP: Record<string, string> = {
+  '0': '₀',
+  '1': '₁',
+  '2': '₂',
+  '3': '₃',
+  '4': '₄',
+  '5': '₅',
+  '6': '₆',
+  '7': '₇',
+  '8': '₈',
+  '9': '₉',
+  '+': '₊',
+  '-': '₋',
+};
+
+function normaliseScriptContent(raw: string): string {
+  return raw
+    .replace(/\\(.)/g, '$1') // unescape Turndown's Markdown escapes (\- -> -)
+    .replace(/[_*`~]/g, '') // strip Markdown emphasis markers
+    .replace(/&nbsp;/g, '')
+    .replace(/ /g, '') // non-breaking space
+    .trim();
+}
+
+function toUnicodeSup(raw: string): string {
+  const clean = normaliseScriptContent(raw);
+  let result = '';
+  for (const ch of clean) {
+    const mapped = SUPER_MAP[ch];
+    if (mapped !== undefined) {
+      result += mapped;
+    } else {
+      return `$^{\\text{${clean}}}$`;
+    }
+  }
+  return result;
+}
+
+function toUnicodeSub(raw: string): string {
+  const clean = normaliseScriptContent(raw);
+  let result = '';
+  for (const ch of clean) {
+    const mapped = SUB_MAP[ch];
+    if (mapped !== undefined) {
+      result += mapped;
+    } else {
+      return `$_{\\text{${clean}}}$`;
+    }
+  }
+  return result;
+}
+
 // ─── HTML → Markdown converter ────────────────────────────────────────────────
 function buildTurndown(): TurndownService {
   const td = new TurndownService({
@@ -91,16 +166,69 @@ function buildTurndown(): TurndownService {
     replacement: (content: string) => content,
   });
 
-  // Superscripts: x<sup>2</sup> → x^{2}
+  // Superscripts: prefer Unicode chars; fall back to $^{\text{...}}$ for KaTeX.
+  // Plain ^{x} without $…$ delimiters is invisible to react-markdown+KaTeX.
   td.addRule('superscript', {
     filter: 'sup',
-    replacement: (content: string) => `^{${content}}`,
+    replacement: (content: string) => toUnicodeSup(content),
   });
 
-  // Subscripts: H<sub>2</sub>O → H_{2}O
+  // Subscripts: prefer Unicode chars; fall back to $_{\text{...}}$ for KaTeX.
   td.addRule('subscript', {
     filter: 'sub',
-    replacement: (content: string) => `_{${content}}`,
+    replacement: (content: string) => toUnicodeSub(content),
+  });
+
+  // Underline — no Markdown equivalent, just output the text.
+  td.addRule('underline', {
+    filter: 'u',
+    replacement: (content: string) => content,
+  });
+
+  // Tables: the GFM plugin skips tables without <th> headers (all 133 legacy
+  // tables are pure <td>). These custom rules convert any table to GFM format,
+  // treating the first row as the header row (required by GFM).
+  td.addRule('tablecell', {
+    filter: ['th', 'td'],
+    replacement: (content: string) =>
+      ` ${content.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim()} |`,
+  });
+
+  td.addRule('tablerow', {
+    filter: 'tr',
+    replacement: (content: string) => `|${content}\n`,
+  });
+
+  td.addRule('table', {
+    filter: 'table',
+    replacement: (content: string, node: Node) => {
+      const colCount = Math.max(
+        ...Array.from((node as HTMLElement).querySelectorAll('tr')).map(
+          (tr) => tr.querySelectorAll('th, td').length,
+        ),
+      );
+      const separator = `| ${Array(colCount).fill('---').join(' | ')} |`;
+      const lines = content
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim());
+      if (!lines.length) return '';
+      return (
+        '\n\n' +
+        lines[0] +
+        '\n' +
+        separator +
+        '\n' +
+        lines.slice(1).join('\n') +
+        '\n\n'
+      );
+    },
+  });
+
+  // Strip <figure> wrapper (CKEditor wraps tables in <figure class="table">).
+  td.addRule('figure', {
+    filter: 'figure',
+    replacement: (content: string) => content,
   });
 
   return td;
