@@ -103,7 +103,7 @@ function normaliseScriptContent(raw: string): string {
     .replace(/\\(.)/g, '$1') // unescape Turndown's Markdown escapes (\- -> -)
     .replace(/[_*`~]/g, '') // strip Markdown emphasis markers
     .replace(/&nbsp;/g, '')
-    .replace(/ /g, '') // non-breaking space
+    .replace(/\u00A0/g, '') // non-breaking space
     .trim();
 }
 
