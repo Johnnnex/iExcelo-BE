@@ -48,7 +48,10 @@ export class AdminUsersService {
     if (cursor) {
       qb.andWhere(
         `(sp.createdAt < :cur OR (sp.createdAt = :cur AND sp.id < :curId))`,
-        { cur: new Date(cursor.split('__')[0]), curId: cursor.split('__')[1] ?? '' },
+        {
+          cur: new Date(cursor.split('__')[0]),
+          curId: cursor.split('__')[1] ?? '',
+        },
       );
     }
 
@@ -64,9 +67,8 @@ export class AdminUsersService {
     if (hasMore) items.pop();
 
     const last = items[items.length - 1];
-    const nextCursor = hasMore && last
-      ? `${last.createdAt.toISOString()}__${last.id}`
-      : null;
+    const nextCursor =
+      hasMore && last ? `${last.createdAt.toISOString()}__${last.id}` : null;
 
     return { items, nextCursor, hasMore };
   }
@@ -76,7 +78,10 @@ export class AdminUsersService {
     if (!user) throw new NotFoundException('User not found');
 
     const tokenString = crypto.randomBytes(64).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(tokenString).digest('hex');
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(tokenString)
+      .digest('hex');
 
     const resetToken = this.passwordResetTokenRepo.create({
       token: hashedToken,
@@ -142,7 +147,10 @@ export class AdminUsersService {
     if (cursor) {
       qb.andWhere(
         `(sp.createdAt < :cur OR (sp.createdAt = :cur AND sp.id < :curId))`,
-        { cur: new Date(cursor.split('__')[0]), curId: cursor.split('__')[1] ?? '' },
+        {
+          cur: new Date(cursor.split('__')[0]),
+          curId: cursor.split('__')[1] ?? '',
+        },
       );
     }
 
@@ -158,9 +166,8 @@ export class AdminUsersService {
     if (hasMore) items.pop();
 
     const last = items[items.length - 1];
-    const nextCursor = hasMore && last
-      ? `${last.createdAt.toISOString()}__${last.id}`
-      : null;
+    const nextCursor =
+      hasMore && last ? `${last.createdAt.toISOString()}__${last.id}` : null;
 
     return { items, nextCursor, hasMore };
   }
@@ -170,7 +177,10 @@ export class AdminUsersService {
     if (!user) throw new NotFoundException('User not found');
 
     const tokenString = crypto.randomBytes(64).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(tokenString).digest('hex');
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(tokenString)
+      .digest('hex');
 
     const resetToken = this.passwordResetTokenRepo.create({
       token: hashedToken,
@@ -217,7 +227,10 @@ export class AdminUsersService {
     if (cursor) {
       qb.andWhere(
         `(ap.createdAt < :cur OR (ap.createdAt = :cur AND ap.id < :curId))`,
-        { cur: new Date(cursor.split('__')[0]), curId: cursor.split('__')[1] ?? '' },
+        {
+          cur: new Date(cursor.split('__')[0]),
+          curId: cursor.split('__')[1] ?? '',
+        },
       );
     }
 
@@ -233,9 +246,8 @@ export class AdminUsersService {
     if (hasMore) items.pop();
 
     const last = items[items.length - 1];
-    const nextCursor = hasMore && last
-      ? `${last.createdAt.toISOString()}__${last.id}`
-      : null;
+    const nextCursor =
+      hasMore && last ? `${last.createdAt.toISOString()}__${last.id}` : null;
 
     return { items, nextCursor, hasMore };
   }
@@ -256,11 +268,7 @@ export class AdminUsersService {
     return { message: 'Affiliate reactivated' };
   }
 
-  async listPayouts(
-    affiliateId: string,
-    page: number,
-    limit: number,
-  ) {
+  async listPayouts(affiliateId: string, page: number, limit: number) {
     const [items, total] = await this.affiliatePayoutRepo.findAndCount({
       where: { affiliateId },
       order: { createdAt: 'DESC' },
@@ -287,7 +295,10 @@ export class AdminUsersService {
       where: { id: payout.affiliateId },
     });
     if (profile) {
-      profile.pendingBalance = Math.max(0, profile.pendingBalance - payout.amount);
+      profile.pendingBalance = Math.max(
+        0,
+        profile.pendingBalance - payout.amount,
+      );
       profile.totalPaidOut += payout.amount;
       await this.affiliateProfileRepo.save(profile);
     }

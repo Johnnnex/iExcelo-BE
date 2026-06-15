@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { ExamAttempt } from '../students/entities/exam-attempt.entity';
 import { PlatformDailyAnalytics } from '../analytics/entities/platform-daily-analytics.entity';
 import { StudentSubjectAnalytics } from '../analytics/entities/student-subject-analytics.entity';
@@ -25,7 +25,9 @@ export class AdminAnalyticsService {
   async getPlatformKpis() {
     const [completionsResult, avgResult, questionsResult] = await Promise.all([
       this.examAttemptRepo.count({
-        where: COMPLETED_STATUSES.map((s) => ({ status: s })) as any,
+        where: COMPLETED_STATUSES.map(
+          (s): FindOptionsWhere<ExamAttempt> => ({ status: s }),
+        ),
       }),
       this.examAttemptRepo
         .createQueryBuilder('ea')
@@ -34,7 +36,10 @@ export class AdminAnalyticsService {
         .getRawOne<{ avg: string }>(),
       this.examAttemptRepo
         .createQueryBuilder('ea')
-        .select('SUM(ea.correctAnswers + ea.wrongAnswers + ea.unanswered)', 'total')
+        .select(
+          'SUM(ea.correctAnswers + ea.wrongAnswers + ea.unanswered)',
+          'total',
+        )
         .where('ea.status IN (:...statuses)', { statuses: COMPLETED_STATUSES })
         .getRawOne<{ total: string }>(),
     ]);
@@ -49,12 +54,16 @@ export class AdminAnalyticsService {
     return {
       totalCompletions: completionsResult,
       avgScore: Math.round(parseFloat(avgResult?.avg ?? '0') * 10) / 10,
-      totalRevenue: Math.round(parseFloat(revenueResult?.total ?? '0') * 100) / 100,
+      totalRevenue:
+        Math.round(parseFloat(revenueResult?.total ?? '0') * 100) / 100,
       totalQuestions: parseInt(questionsResult?.total ?? '0', 10),
     };
   }
 
-  async getExamCompletions(granularity: 'day' | 'week' | 'month', timezone = 'UTC') {
+  async getExamCompletions(
+    granularity: 'day' | 'week' | 'month',
+    timezone = 'UTC',
+  ) {
     const { startDate, truncUnit } = this._dateRange(granularity);
 
     const rows = await this.examAttemptRepo
@@ -69,11 +78,15 @@ export class AdminAnalyticsService {
       .orderBy('period', 'ASC')
       .getRawMany<{ period: string; count: string }>();
 
-    const map = new Map(rows.map((r) => [new Date(r.period).toISOString().slice(0, 10), r]));
-    return this._generatePeriods(granularity).map((period) => ({
+    const map = new Map(
+      rows.map((r) => [new Date(r.period).toISOString().slice(0, 10), r]),
+    );
+    const result = this._generatePeriods(granularity).map((period) => ({
       name: period,
       Completions: Number(map.get(period)?.count ?? 0),
     }));
+    if (result.every((r) => r.Completions === 0)) return [];
+    return result;
   }
 
   async getSubjectPerformance() {
@@ -88,14 +101,20 @@ export class AdminAnalyticsService {
       .groupBy('sub.id, sub.name')
       .orderBy('"totalAttempted"', 'DESC')
       .limit(10)
-      .getRawMany<{ subjectName: string; totalAttempted: string; totalCorrect: string }>();
+      .getRawMany<{
+        subjectName: string;
+        totalAttempted: string;
+        totalCorrect: string;
+      }>();
 
     return rows.map((r) => ({
       name: r.subjectName,
       Accuracy:
         Number(r.totalAttempted) === 0
           ? 0
-          : Math.round((Number(r.totalCorrect) / Number(r.totalAttempted)) * 100),
+          : Math.round(
+              (Number(r.totalCorrect) / Number(r.totalAttempted)) * 100,
+            ),
       Attempts: Number(r.totalAttempted),
     }));
   }
@@ -111,14 +130,31 @@ export class AdminAnalyticsService {
       .where('ea.status IN (:...statuses)', { statuses: COMPLETED_STATUSES })
       .getRawOne<{ correct: string; wrong: string; unanswered: string }>();
 
-    return [
-      { name: 'Correct', value: parseInt(result?.correct ?? '0', 10), fill: '#007FFF' },
-      { name: 'Wrong', value: parseInt(result?.wrong ?? '0', 10), fill: '#A12161' },
-      { name: 'Unanswered', value: parseInt(result?.unanswered ?? '0', 10), fill: '#F3A218' },
+    const items = [
+      {
+        name: 'Correct',
+        value: parseInt(result?.correct ?? '0', 10),
+        fill: '#007FFF',
+      },
+      {
+        name: 'Wrong',
+        value: parseInt(result?.wrong ?? '0', 10),
+        fill: '#A12161',
+      },
+      {
+        name: 'Unanswered',
+        value: parseInt(result?.unanswered ?? '0', 10),
+        fill: '#F3A218',
+      },
     ];
+    if (items.every((item) => item.value === 0)) return [];
+    return items;
   }
 
-  async getRevenueOverTime(granularity: 'day' | 'week' | 'month', timezone = 'UTC') {
+  async getRevenueOverTime(
+    granularity: 'day' | 'week' | 'month',
+    timezone = 'UTC',
+  ) {
     const { startDate, truncUnit } = this._dateRange(granularity);
 
     const rows = await this.platformAnalyticsRepo
@@ -133,12 +169,18 @@ export class AdminAnalyticsService {
       .orderBy('period', 'ASC')
       .getRawMany<{ period: string; revenue: string; subscriptions: string }>();
 
-    const map = new Map(rows.map((r) => [new Date(r.period).toISOString().slice(0, 10), r]));
-    return this._generatePeriods(granularity).map((period) => ({
+    const map = new Map(
+      rows.map((r) => [new Date(r.period).toISOString().slice(0, 10), r]),
+    );
+    const result = this._generatePeriods(granularity).map((period) => ({
       name: period,
-      Revenue: Math.round(parseFloat(map.get(period)?.revenue ?? '0') * 100) / 100,
+      Revenue:
+        Math.round(parseFloat(map.get(period)?.revenue ?? '0') * 100) / 100,
       Subscriptions: Number(map.get(period)?.subscriptions ?? 0),
     }));
+    if (result.every((r) => r.Revenue === 0 && r.Subscriptions === 0))
+      return [];
+    return result;
   }
 
   async getExamTypeBreakdown() {
@@ -155,7 +197,16 @@ export class AdminAnalyticsService {
       .orderBy('completions', 'DESC')
       .getRawMany<{ name: string; completions: string; avgScore: string }>();
 
-    const COLORS = ['#007FFF', '#A12161', '#4BABFF', '#D4527A', '#0052CC', '#E91E8C', '#66C2FF', '#8B1A50'];
+    const COLORS = [
+      '#007FFF',
+      '#A12161',
+      '#4BABFF',
+      '#D4527A',
+      '#0052CC',
+      '#E91E8C',
+      '#66C2FF',
+      '#8B1A50',
+    ];
     return rows.map((r, i) => ({
       name: r.name,
       Completions: Number(r.completions),
@@ -176,12 +227,16 @@ export class AdminAnalyticsService {
         periods.push(iso(d));
       }
     } else if (granularity === 'week') {
-      const firstDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const firstDay = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+      );
       const dow = firstDay.getUTCDay();
       const toMonday = dow === 0 ? -6 : 1 - dow;
       const cur = new Date(firstDay);
       cur.setUTCDate(firstDay.getUTCDate() + toMonday);
-      const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+      const lastDay = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0),
+      );
       while (cur <= lastDay) {
         periods.push(iso(cur));
         cur.setUTCDate(cur.getUTCDate() + 7);
@@ -203,7 +258,10 @@ export class AdminAnalyticsService {
       return { startDate, truncUnit: 'day' };
     }
     if (granularity === 'week') {
-      return { startDate: new Date(now.getFullYear(), now.getMonth(), 1), truncUnit: 'week' };
+      return {
+        startDate: new Date(now.getFullYear(), now.getMonth(), 1),
+        truncUnit: 'week',
+      };
     }
     return { startDate: new Date(now.getFullYear(), 0, 1), truncUnit: 'month' };
   }

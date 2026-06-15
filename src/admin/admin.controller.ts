@@ -26,7 +26,10 @@ import { AdminUsersService } from './admin-users.service';
 import { AdminSubscriptionsService } from './admin-subscriptions.service';
 import { AdminTestimonialsService } from './admin-testimonials.service';
 import type { TestimonialDto } from './admin-testimonials.service';
-import { AdminBulkEmailsService, CampaignDto } from './admin-bulk-emails.service';
+import {
+  AdminBulkEmailsService,
+  CampaignDto,
+} from './admin-bulk-emails.service';
 import { AdminMessagesService } from './admin-messages.service';
 import { AdminAnalyticsService } from './admin-analytics.service';
 import { SubscriptionStatus } from '../../types';
@@ -122,8 +125,12 @@ export class AdminRolesController {
 
   @Get()
   @AdminAccess(AdminModule.ADMIN_MANAGEMENT, 'read')
-  listRoles() {
-    return this.adminService.listRoles();
+  listRoles(
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.listRoles(Number(page), Number(limit), search);
   }
 
   @Post()
@@ -186,26 +193,39 @@ export class AdminExamRevisionController {
     @Query('limit') limit = '50',
     @Query('search') search?: string,
   ) {
-    return this.examRevision.listExamTypes({ page: Number(page), limit: Number(limit), search });
+    return this.examRevision.listExamTypes({
+      page: Number(page),
+      limit: Number(limit),
+      search,
+    });
   }
 
   @Post('exam-types')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  createExamType(@Body() body: {
-    name: string;
-    description?: string;
-    minSubjectsSelectable: number;
-    maxSubjectsSelectable: number;
-    freeTierQuestionLimit?: number;
-    supportedCategories: string[];
-  }) {
+  createExamType(
+    @Body()
+    body: {
+      name: string;
+      description?: string;
+      minSubjectsSelectable: number;
+      maxSubjectsSelectable: number;
+      freeTierQuestionLimit?: number;
+      supportedCategories: string[];
+    },
+  ) {
     return this.examRevision.createExamType(body);
   }
 
   @Patch('exam-types/:id')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  updateExamType(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.examRevision.updateExamType(id, body as Parameters<AdminExamRevisionService['updateExamType']>[1]);
+  updateExamType(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.examRevision.updateExamType(
+      id,
+      body as Parameters<AdminExamRevisionService['updateExamType']>[1],
+    );
   }
 
   @Delete('exam-types/:id')
@@ -222,19 +242,31 @@ export class AdminExamRevisionController {
     @Query('limit') limit = '50',
     @Query('search') search?: string,
   ) {
-    return this.examRevision.listSubjects({ page: Number(page), limit: Number(limit), search });
+    return this.examRevision.listSubjects({
+      page: Number(page),
+      limit: Number(limit),
+      search,
+    });
   }
 
   @Post('subjects')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  createSubject(@Body() body: { name: string; description?: string }) {
+  createSubject(
+    @Body() body: { name: string; description?: string; isActive?: boolean },
+  ) {
     return this.examRevision.createSubject(body);
   }
 
   @Patch('subjects/:id')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  updateSubject(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.examRevision.updateSubject(id, body as Parameters<AdminExamRevisionService['updateSubject']>[1]);
+  updateSubject(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.examRevision.updateSubject(
+      id,
+      body as Parameters<AdminExamRevisionService['updateSubject']>[1],
+    );
   }
 
   @Delete('subjects/:id')
@@ -244,6 +276,24 @@ export class AdminExamRevisionController {
   }
 
   // ExamTypeSubjects (linking)
+  @Get('ets')
+  @AdminAccess(AdminModule.EXAM_REVISION, 'read')
+  listAllEts(
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+    @Query('search') search?: string,
+    @Query('examTypeId') examTypeId?: string,
+    @Query('subjectId') subjectId?: string,
+  ) {
+    return this.examRevision.listAllEts({
+      page: Number(page),
+      limit: Number(limit),
+      search,
+      examTypeId,
+      subjectId,
+    });
+  }
+
   @Get('exam-type-subjects')
   @AdminAccess(AdminModule.EXAM_REVISION, 'read')
   listExamTypeSubjects(@Query('examTypeId') examTypeId?: string) {
@@ -252,8 +302,28 @@ export class AdminExamRevisionController {
 
   @Post('exam-type-subjects')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  linkExamTypeSubject(@Body() body: { examTypeId: string; subjectId: string; isCompulsory?: boolean }) {
-    return this.examRevision.linkExamTypeSubject(body.examTypeId, body.subjectId, body.isCompulsory);
+  linkExamTypeSubject(
+    @Body()
+    body: {
+      examTypeId: string;
+      subjectId: string;
+      isCompulsory?: boolean;
+    },
+  ) {
+    return this.examRevision.linkExamTypeSubject(
+      body.examTypeId,
+      body.subjectId,
+      body.isCompulsory,
+    );
+  }
+
+  @Patch('exam-type-subjects/:id')
+  @AdminAccess(AdminModule.EXAM_REVISION, 'write')
+  updateExamTypeSubject(
+    @Param('id') id: string,
+    @Body() body: { isCompulsory: boolean },
+  ) {
+    return this.examRevision.updateExamTypeSubject(id, body);
   }
 
   @Delete('exam-type-subjects/:id')
@@ -271,19 +341,29 @@ export class AdminExamRevisionController {
     @Query('subjectId') subjectId?: string,
     @Query('search') search?: string,
   ) {
-    return this.examRevision.listTopics({ page: Number(page), limit: Number(limit), subjectId, search });
+    return this.examRevision.listTopics({
+      page: Number(page),
+      limit: Number(limit),
+      subjectId,
+      search,
+    });
   }
 
   @Post('topics')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  createTopic(@Body() body: { subjectId: string; name: string; content?: string }) {
+  createTopic(
+    @Body() body: { subjectId: string; name: string; content?: string },
+  ) {
     return this.examRevision.createTopic(body);
   }
 
   @Patch('topics/:id')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
   updateTopic(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.examRevision.updateTopic(id, body as Parameters<AdminExamRevisionService['updateTopic']>[1]);
+    return this.examRevision.updateTopic(
+      id,
+      body as Parameters<AdminExamRevisionService['updateTopic']>[1],
+    );
   }
 
   @Delete('topics/:id')
@@ -301,19 +381,32 @@ export class AdminExamRevisionController {
     @Query('examTypeSubjectId') examTypeSubjectId?: string,
     @Query('search') search?: string,
   ) {
-    return this.examRevision.listPassages({ page: Number(page), limit: Number(limit), examTypeSubjectId, search });
+    return this.examRevision.listPassages({
+      page: Number(page),
+      limit: Number(limit),
+      examTypeSubjectId,
+      search,
+    });
   }
 
   @Post('passages')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  createPassage(@Body() body: { examTypeSubjectId: string; title: string; content: string }) {
+  createPassage(
+    @Body() body: { examTypeSubjectId: string; title: string; content: string },
+  ) {
     return this.examRevision.createPassage(body);
   }
 
   @Patch('passages/:id')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  updatePassage(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.examRevision.updatePassage(id, body as Parameters<AdminExamRevisionService['updatePassage']>[1]);
+  updatePassage(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.examRevision.updatePassage(
+      id,
+      body as Parameters<AdminExamRevisionService['updatePassage']>[1],
+    );
   }
 
   @Delete('passages/:id')
@@ -353,14 +446,22 @@ export class AdminExamRevisionController {
 
   @Post('questions')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  createQuestion(@Body() body: Parameters<AdminExamRevisionService['createQuestion']>[0]) {
+  createQuestion(
+    @Body() body: Parameters<AdminExamRevisionService['createQuestion']>[0],
+  ) {
     return this.examRevision.createQuestion(body);
   }
 
   @Patch('questions/:id')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  updateQuestion(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.examRevision.updateQuestion(id, body as Parameters<AdminExamRevisionService['updateQuestion']>[1]);
+  updateQuestion(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.examRevision.updateQuestion(
+      id,
+      body as Parameters<AdminExamRevisionService['updateQuestion']>[1],
+    );
   }
 
   @Delete('questions/:id')
@@ -378,7 +479,10 @@ export class AdminExamRevisionController {
   @Get('questions/csv-template')
   @AdminAccess(AdminModule.EXAM_REVISION, 'read')
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="questions-template.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="questions-template.csv"',
+  )
   getCsvTemplate(@Res() res: Response) {
     res.send(this.examRevision.getQuestionCsvTemplate());
   }
@@ -425,7 +529,10 @@ export class AdminStudentsController {
     @Param('userId') userId: string,
     @Body() body: { suspendedUntil: string },
   ) {
-    return this.usersService.suspendStudent(userId, new Date(body.suspendedUntil));
+    return this.usersService.suspendStudent(
+      userId,
+      new Date(body.suspendedUntil),
+    );
   }
 
   @Patch(':userId/unsuspend')
@@ -507,7 +614,11 @@ export class AdminAffiliatesController {
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
-    return this.usersService.listPayouts(affiliateId, Number(page), Number(limit));
+    return this.usersService.listPayouts(
+      affiliateId,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @Patch('payouts/:payoutId/approve')
@@ -531,7 +642,9 @@ export class AdminAffiliatesController {
 @Controller('admin/subscriptions')
 @UseGuards(AdminJwtGuard, AdminAccessGuard)
 export class AdminSubscriptionsController {
-  constructor(private readonly subscriptionsService: AdminSubscriptionsService) {}
+  constructor(
+    private readonly subscriptionsService: AdminSubscriptionsService,
+  ) {}
 
   @Get()
   @AdminAccess(AdminModule.SUBSCRIPTIONS, 'read')
@@ -589,6 +702,12 @@ export class AdminSubscriptionsController {
       durationDays: number;
       sortOrder?: number;
       stripeProductId?: string;
+      prices?: Array<{
+        currency: string;
+        amount: number;
+        stripePriceId?: string;
+        paystackPlanCode?: string;
+      }>;
     },
   ) {
     return this.subscriptionsService.createPlan(body);
@@ -606,6 +725,12 @@ export class AdminSubscriptionsController {
       sortOrder?: number;
       stripeProductId?: string;
       isActive?: boolean;
+      prices?: Array<{
+        currency: string;
+        amount: number;
+        stripePriceId?: string;
+        paystackPlanCode?: string;
+      }>;
     },
   ) {
     return this.subscriptionsService.updatePlan(id, body);
@@ -615,6 +740,50 @@ export class AdminSubscriptionsController {
   @AdminAccess(AdminModule.SUBSCRIPTIONS, 'write')
   deletePlan(@Param('id') id: string) {
     return this.subscriptionsService.deletePlan(id);
+  }
+
+  @Get('region-currencies')
+  @AdminAccess(AdminModule.SUBSCRIPTIONS, 'read')
+  listRegionCurrencies(
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+    @Query('search') search?: string,
+  ) {
+    return this.subscriptionsService.listRegionCurrencies({
+      page: Number(page),
+      limit: Number(limit),
+      search,
+    });
+  }
+
+  @Post('region-currencies')
+  @AdminAccess(AdminModule.SUBSCRIPTIONS, 'write')
+  createRegionCurrency(
+    @Body()
+    body: {
+      regionCode: string;
+      regionName: string;
+      currency: string;
+      paymentProvider: string;
+      isActive?: boolean;
+    },
+  ) {
+    return this.subscriptionsService.createRegionCurrency(body);
+  }
+
+  @Patch('region-currencies/:id')
+  @AdminAccess(AdminModule.SUBSCRIPTIONS, 'write')
+  updateRegionCurrency(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      regionName?: string;
+      currency?: string;
+      paymentProvider?: string;
+      isActive?: boolean;
+    },
+  ) {
+    return this.subscriptionsService.updateRegionCurrency(id, body);
   }
 }
 
@@ -671,10 +840,7 @@ export class AdminBulkEmailsController {
 
   @Get()
   @AdminAccess(AdminModule.BULK_EMAILS, 'read')
-  list(
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-  ) {
+  list(@Query('page') page = '1', @Query('limit') limit = '20') {
     return this.bulkEmailsService.listCampaigns(Number(page), Number(limit));
   }
 
@@ -682,7 +848,13 @@ export class AdminBulkEmailsController {
   @AdminAccess(AdminModule.BULK_EMAILS, 'write')
   create(
     @Request() req: { user: { sub: string } },
-    @Body() body: { name: string; subject: string; content: string; targetAudience: CampaignTargetAudience },
+    @Body()
+    body: {
+      name: string;
+      subject: string;
+      content: string;
+      targetAudience: CampaignTargetAudience;
+    },
   ) {
     const dto: CampaignDto = {
       name: body.name,
@@ -697,7 +869,13 @@ export class AdminBulkEmailsController {
   @AdminAccess(AdminModule.BULK_EMAILS, 'write')
   update(
     @Param('id') id: string,
-    @Body() body: Partial<{ name: string; subject: string; content: string; targetAudience: CampaignTargetAudience }>,
+    @Body()
+    body: Partial<{
+      name: string;
+      subject: string;
+      content: string;
+      targetAudience: CampaignTargetAudience;
+    }>,
   ) {
     return this.bulkEmailsService.updateCampaign(id, body);
   }
@@ -758,7 +936,10 @@ export class AdminMessagesController {
     @Param('userId') userId: string,
     @Body() body: { suspendedUntil: string },
   ) {
-    return this.messagesService.suspendUser(userId, new Date(body.suspendedUntil));
+    return this.messagesService.suspendUser(
+      userId,
+      new Date(body.suspendedUntil),
+    );
   }
 }
 

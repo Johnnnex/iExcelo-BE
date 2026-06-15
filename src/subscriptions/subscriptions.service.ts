@@ -28,13 +28,7 @@ import { Giveback } from '../sponsors/entities/giveback.entity';
 import { LoggerService } from '../logger/logger.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AffiliatesService } from '../affiliates/affiliates.service';
-import {
-  regionsData,
-  defaultRegion,
-  plansData,
-  planPricesData,
-  paystackPlanCodes,
-} from './data';
+import { plansData, planPricesData, paystackPlanCodes } from './data';
 import {
   SubscriptionStatus,
   GivebackStatus,

@@ -14,17 +14,17 @@ export enum QuestionDifficulty {
 // WAEC / NECO / GCE → OBJECTIVES + THEORY + PRACTICAL (subject-dependent)
 export enum QuestionCategory {
   OBJECTIVES = 'objectives', // Multiple-choice paper
-  THEORY = 'theory',         // Written/essay paper
-  PRACTICAL = 'practical',   // Lab or hands-on paper
+  THEORY = 'theory', // Written/essay paper
+  PRACTICAL = 'practical', // Lab or hands-on paper
 }
 
 // Question selection filter for paid users when starting an exam.
 // Demo users always get MIXED within the free-tier pool (no choice).
 export enum QuestionFilter {
-  MIXED   = 'mixed',   // ~90% unseen + ~10% seen (worst performance first)
-  FRESH   = 'fresh',   // Unseen only — falls back to seen if bank exhausted
+  MIXED = 'mixed', // ~90% unseen + ~10% seen (worst performance first)
+  FRESH = 'fresh', // Unseen only — falls back to seen if bank exhausted
   FLAGGED = 'flagged', // Questions the student explicitly flagged for review
-  WEAK    = 'weak',    // Questions with poor performance (most wrong first)
+  WEAK = 'weak', // Questions with poor performance (most wrong first)
 }
 
 export enum QuestionType {
@@ -186,16 +186,16 @@ export enum GivebackType {
 }
 
 export enum GivebackStatus {
-  PENDING = 'pending',     // Payment not yet confirmed
-  ACTIVE = 'active',       // Payment confirmed, subscriptions running
-  EXPIRED = 'expired',     // endDate has passed (lazy-set on next read)
-  FAILED = 'failed',       // Payment failed / cancelled
+  PENDING = 'pending', // Payment not yet confirmed
+  ACTIVE = 'active', // Payment confirmed, subscriptions running
+  EXPIRED = 'expired', // endDate has passed (lazy-set on next read)
+  FAILED = 'failed', // Payment failed / cancelled
 }
 
 export enum SponsorInviteStatus {
-  PENDING = 'pending',     // Email sent, student hasn't activated yet
-  ACCEPTED = 'accepted',  // Student clicked link and set password
-  EXPIRED = 'expired',    // 7-day window passed without activation
+  PENDING = 'pending', // Email sent, student hasn't activated yet
+  ACCEPTED = 'accepted', // Student clicked link and set password
+  EXPIRED = 'expired', // 7-day window passed without activation
 }
 
 export enum ChatroomType {

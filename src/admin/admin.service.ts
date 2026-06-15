@@ -252,8 +252,15 @@ export class AdminService {
 
   // ─── Role templates ────────────────────────────────────────────────────────
 
-  async listRoles() {
-    return this.adminRoleRepo.find({ order: { name: 'ASC' } });
+  async listRoles(page = 1, limit = 50, search?: string) {
+    const qb = this.adminRoleRepo
+      .createQueryBuilder('r')
+      .orderBy('r.name', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
+    if (search) qb.where('r.name ILIKE :s', { s: `%${search}%` });
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, page };
   }
 
   async createRole(

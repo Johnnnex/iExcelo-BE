@@ -41,6 +41,8 @@ import { AffiliateProfile } from '../affiliates/entities/affiliate-profile.entit
 import { AffiliatePayout } from '../affiliates/entities/affiliate-payout.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { SubscriptionPlan } from '../subscriptions/entities/subscription-plan.entity';
+import { PlanPrice } from '../subscriptions/entities/plan-price.entity';
+import { RegionCurrency } from '../subscriptions/entities/region-currency.entity';
 import { ExamType } from '../exams/entities/exam-type.entity';
 import { Subject } from '../exams/entities/subject.entity';
 import { ExamTypeSubject } from '../exams/entities/exam-type-subject.entity';
@@ -73,6 +75,8 @@ import { EMAILS_QUEUE } from '../email/queue/email.queue';
       AffiliatePayout,
       Subscription,
       SubscriptionPlan,
+      PlanPrice,
+      RegionCurrency,
       ExamType,
       Subject,
       ExamTypeSubject,

@@ -73,9 +73,20 @@ export const migration002: IMigration = {
         continue;
       }
 
-      const subject = await subjectRepo.save(
-        subjectRepo.create({ name: data.name, description: data.description }),
-      );
+      // Find or create the subject — never create a duplicate row for the same name
+      let subject = await subjectRepo
+        .createQueryBuilder('s')
+        .where('s.name ILIKE :name', { name: data.name })
+        .getOne();
+      if (!subject) {
+        subject = await subjectRepo.save(
+          subjectRepo.create({
+            name: data.name,
+            description: data.description,
+          }),
+        );
+        console.log(`      + Subject (new): ${data.name}`);
+      }
       await etsRepo.save(
         etsRepo.create({
           examTypeId: examType.id,
@@ -83,7 +94,7 @@ export const migration002: IMigration = {
           isCompulsory: data.isCompulsory,
         }),
       );
-      console.log(`      + Subject: ${data.examTypeName} / ${data.name}`);
+      console.log(`      + ETS link: ${data.examTypeName} / ${data.name}`);
     }
 
     // ── 3. Resolve practicalSubjectIds per ExamType ────────────────────────
