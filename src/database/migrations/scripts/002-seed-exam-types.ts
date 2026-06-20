@@ -70,6 +70,18 @@ export const migration002: IMigration = {
             isCompulsory: data.isCompulsory,
           });
         }
+        // Keep isAlsoPractical in sync on re-runs
+        const subjectForEts = await subjectRepo.findOne({
+          where: { id: existingEts.subjectId },
+        });
+        if (
+          subjectForEts &&
+          subjectForEts.isAlsoPractical !== data.isAlsoPractical
+        ) {
+          await subjectRepo.update(subjectForEts.id, {
+            isAlsoPractical: data.isAlsoPractical,
+          });
+        }
         continue;
       }
 
@@ -83,9 +95,14 @@ export const migration002: IMigration = {
           subjectRepo.create({
             name: data.name,
             description: data.description,
+            isAlsoPractical: data.isAlsoPractical,
           }),
         );
         console.log(`      + Subject (new): ${data.name}`);
+      } else if (subject.isAlsoPractical !== data.isAlsoPractical) {
+        await subjectRepo.update(subject.id, {
+          isAlsoPractical: data.isAlsoPractical,
+        });
       }
       await etsRepo.save(
         etsRepo.create({

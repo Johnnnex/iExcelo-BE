@@ -389,6 +389,7 @@ export class StudentsService {
       selectedSubjects: selectedSubjects.map((s) => ({
         id: s.subject.id,
         name: s.subject.name,
+        totalQuestions: s.subject.totalQuestions ?? 0,
         questionsAttempted: subjectProgressMap.get(s.subject.id) ?? 0,
       })),
       stats: {
@@ -665,6 +666,7 @@ export class StudentsService {
       startedAt: attempt.startedAt,
       completedAt: attempt.completedAt,
       status: attempt.status,
+      category: attempt.category ?? null,
     }));
 
     return { data, total, page };
@@ -744,6 +746,7 @@ export class StudentsService {
       startedAt: attempt.startedAt,
       completedAt: attempt.completedAt,
       status: attempt.status,
+      category: attempt.category ?? null,
       questionStatuses,
       detailedResults,
     };

@@ -16,6 +16,9 @@ export class Subject extends BaseEntity {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ default: false })
+  isAlsoPractical: boolean; // true for Biology, Physics, Chemistry, Agricultural Science
+
   // ─── Relations ─────────────────────────────────────────────────────────
 
   @OneToMany(() => ExamTypeSubject, (ets) => ets.subject)

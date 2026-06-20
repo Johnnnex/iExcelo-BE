@@ -76,6 +76,8 @@ export enum Currency {
   EUR = 'EUR',
   CAD = 'CAD',
   AUD = 'AUD',
+  GHS = 'GHS', // Ghanaian Cedi — Paystack
+  GMD = 'GMD', // Gambian Dalasi — Stripe
 }
 
 // Legacy alias for backwards compatibility - will be removed

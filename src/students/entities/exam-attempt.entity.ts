@@ -71,6 +71,9 @@ export class ExamAttempt extends BaseEntity {
   @Column({ type: 'timestamp', nullable: true })
   completedAt: Date;
 
+  @Column({ nullable: true })
+  category: string; // QuestionCategory — null if exam used all categories
+
   // All question IDs for this attempt (ordered). Used for paginated /questions endpoint.
   // Stored so the order is deterministic across page loads.
   @Column({ type: 'json', nullable: true })

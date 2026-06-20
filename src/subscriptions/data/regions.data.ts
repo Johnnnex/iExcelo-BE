@@ -65,7 +65,7 @@ export const regionsData = [
   {
     regionCode: 'GH',
     regionName: 'Ghana',
-    currency: Currency.USD,
+    currency: Currency.GHS,
     paymentProvider: PaymentProvider.PAYSTACK,
   },
   {
@@ -79,6 +79,25 @@ export const regionsData = [
     regionName: 'South Africa',
     currency: Currency.USD,
     paymentProvider: PaymentProvider.PAYSTACK,
+  },
+  // West African expansion — Stripe (no Paystack support in these regions)
+  {
+    regionCode: 'LR',
+    regionName: 'Liberia',
+    currency: Currency.USD, // Liberia uses USD as de facto currency
+    paymentProvider: PaymentProvider.STRIPE,
+  },
+  {
+    regionCode: 'GM',
+    regionName: 'Gambia',
+    currency: Currency.GMD,
+    paymentProvider: PaymentProvider.STRIPE,
+  },
+  {
+    regionCode: 'SL',
+    regionName: 'Sierra Leone',
+    currency: Currency.USD, // SLE not yet supported by major processors
+    paymentProvider: PaymentProvider.STRIPE,
   },
 ];
 

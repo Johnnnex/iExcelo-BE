@@ -90,9 +90,12 @@ export class ExamsService {
     });
 
     return etsRecords
-      .map((ets) => ets.subject)
-      .filter((s) => s?.isActive)
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .filter((ets) => ets.subject?.isActive)
+      .sort((a, b) => a.subject.name.localeCompare(b.subject.name))
+      .map((ets) => ({
+        ...ets.subject,
+        isCompulsory: ets.isCompulsory,
+      }));
   }
 
   // ─── Start Exam ───────────────────────────────────────────────────────────
@@ -249,6 +252,7 @@ export class ExamsService {
       startedAt: new Date(),
       questionResponses: [],
       questionIds: questions.map((q) => q.id),
+      category: dto.category ?? null,
     });
 
     // 8. Serialize questions — return first page only (up to PAGE_SIZE)

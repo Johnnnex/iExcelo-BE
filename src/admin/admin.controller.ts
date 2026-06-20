@@ -591,8 +591,9 @@ export class AdminAffiliatesController {
     @Query('limit') limit = '50',
     @Query('search') search?: string,
     @Query('cursor') cursor?: string,
+    @Query('userType') userType?: string,
   ) {
-    return this.usersService.listAffiliates(Number(limit), search, cursor);
+    return this.usersService.listAffiliates(Number(limit), search, cursor, userType);
   }
 
   @Patch(':userId/deactivate')
@@ -605,6 +606,20 @@ export class AdminAffiliatesController {
   @AdminAccess(AdminModule.AFFILIATES, 'write')
   reactivate(@Param('userId') userId: string) {
     return this.usersService.reactivateAffiliate(userId);
+  }
+
+  @Get('payouts')
+  @AdminAccess(AdminModule.AFFILIATES, 'read')
+  listAllPayouts(
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+    @Query('status') status?: string,
+  ) {
+    return this.usersService.listAllPayouts(
+      Number(page),
+      Number(limit),
+      status,
+    );
   }
 
   @Get(':affiliateId/payouts')

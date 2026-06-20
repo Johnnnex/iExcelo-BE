@@ -216,7 +216,7 @@ export class AdminUsersService {
 
   // ─── Affiliates ────────────────────────────────────────────────────────────
 
-  async listAffiliates(limit: number, search?: string, cursor?: string) {
+  async listAffiliates(limit: number, search?: string, cursor?: string, userType?: string) {
     const qb = this.affiliateProfileRepo
       .createQueryBuilder('ap')
       .leftJoinAndSelect('ap.user', 'u')
@@ -239,6 +239,10 @@ export class AdminUsersService {
         `(u.firstName ILIKE :s OR u.lastName ILIKE :s OR u.email ILIKE :s OR ap.affiliateCode ILIKE :s)`,
         { s: `%${search}%` },
       );
+    }
+
+    if (userType) {
+      qb.andWhere('u.role = :userType', { userType });
     }
 
     const items = await qb.getMany();
@@ -319,5 +323,23 @@ export class AdminUsersService {
     payout.processedAt = new Date();
     await this.affiliatePayoutRepo.save(payout);
     return { message: 'Payout rejected' };
+  }
+
+  async listAllPayouts(
+    page: number,
+    limit: number,
+    status?: string,
+  ) {
+    const where: Record<string, unknown> = {};
+    if (status) where.status = status;
+
+    const [items, total] = await this.affiliatePayoutRepo.findAndCount({
+      where,
+      relations: ['affiliate', 'affiliate.user'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return { items, total, page };
   }
 }
