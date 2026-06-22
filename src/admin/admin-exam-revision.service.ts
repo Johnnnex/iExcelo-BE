@@ -221,9 +221,13 @@ export class AdminExamRevisionService {
     const link = await this.examTypeSubjectRepo.findOne({ where: { id } });
     if (!link) throw new NotFoundException('Link not found');
 
-    const [questionCount, passageCount] = await Promise.all([
+    const passageCount = await this.passageRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.examTypeSubjects', 'ets', 'ets.id = :id', { id })
+      .getCount();
+
+    const [questionCount] = await Promise.all([
       this.questionRepo.count({ where: { examTypeSubjectId: id } }),
-      this.passageRepo.count({ where: { examTypeSubjectId: id } }),
     ]);
 
     if (questionCount > 0 || passageCount > 0) {
@@ -288,36 +292,70 @@ export class AdminExamRevisionService {
   }) {
     const qb = this.passageRepo
       .createQueryBuilder('p')
-      .leftJoinAndSelect('p.examTypeSubject', 'ets')
+      .leftJoinAndSelect('p.examTypeSubjects', 'ets')
       .leftJoinAndSelect('ets.examType', 'et')
       .leftJoinAndSelect('ets.subject', 'subject')
       .orderBy('p.createdAt', 'DESC')
       .skip((opts.page - 1) * opts.limit)
       .take(opts.limit);
     if (opts.examTypeSubjectId)
-      qb.andWhere('p.examTypeSubjectId = :etsId', {
-        etsId: opts.examTypeSubjectId,
-      });
+      qb.andWhere('ets.id = :etsId', { etsId: opts.examTypeSubjectId });
     if (opts.search) qb.andWhere('p.title ILIKE :s', { s: `%${opts.search}%` });
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, page: opts.page, limit: opts.limit };
+    const serialized = items.map((p) => ({
+      id: p.id,
+      title: p.title,
+      content: p.content,
+      isActive: p.isActive,
+      createdAt: p.createdAt,
+      examTypeSubjectIds: (p.examTypeSubjects ?? []).map((e) => e.id),
+      examTypeSubjects: (p.examTypeSubjects ?? []).map((e) => ({
+        id: e.id,
+        examType: e.examType ? { name: e.examType.name } : undefined,
+        subject: e.subject ? { name: e.subject.name } : undefined,
+      })),
+    }));
+    return { items: serialized, total, page: opts.page, limit: opts.limit };
   }
 
-  createPassage(dto: {
-    examTypeSubjectId: string;
+  async createPassage(dto: {
+    examTypeSubjectIds: string[];
     title: string;
     content: string;
   }) {
-    return this.passageRepo.save(this.passageRepo.create(dto));
+    const etsList = await this.examTypeSubjectRepo.findByIds(dto.examTypeSubjectIds);
+    if (etsList.length === 0)
+      throw new BadRequestException('At least one valid ETS is required');
+    const p = this.passageRepo.create({
+      title: dto.title,
+      content: dto.content,
+      examTypeSubjects: etsList,
+    });
+    return this.passageRepo.save(p);
   }
 
   async updatePassage(
     id: string,
-    dto: Partial<{ title: string; content: string; isActive: boolean }>,
+    dto: Partial<{
+      examTypeSubjectIds: string[];
+      title: string;
+      content: string;
+      isActive: boolean;
+    }>,
   ) {
-    const p = await this.passageRepo.findOne({ where: { id } });
+    const p = await this.passageRepo.findOne({
+      where: { id },
+      relations: ['examTypeSubjects'],
+    });
     if (!p) throw new NotFoundException('Passage not found');
-    Object.assign(p, dto);
+    if (dto.title !== undefined) p.title = dto.title;
+    if (dto.content !== undefined) p.content = dto.content;
+    if (dto.isActive !== undefined) p.isActive = dto.isActive;
+    if (dto.examTypeSubjectIds !== undefined) {
+      p.examTypeSubjects = await this.examTypeSubjectRepo.findByIds(
+        dto.examTypeSubjectIds,
+      );
+    }
     return this.passageRepo.save(p);
   }
 
@@ -384,7 +422,24 @@ export class AdminExamRevisionService {
     return q;
   }
 
-  createQuestion(dto: {
+  private async validateQuestionCategory(
+    examTypeSubjectId: string,
+    category: string,
+  ) {
+    const ets = await this.examTypeSubjectRepo.findOne({
+      where: { id: examTypeSubjectId },
+      relations: ['examType'],
+    });
+    if (!ets) throw new NotFoundException('Exam type + subject link not found');
+    const supported = ets.examType?.supportedCategories ?? [];
+    if (supported.length > 0 && !supported.includes(category as QuestionCategory)) {
+      throw new BadRequestException(
+        `Category '${category}' is not supported by this exam type. Supported: ${supported.join(', ')}`,
+      );
+    }
+  }
+
+  async createQuestion(dto: {
     examTypeSubjectId: string;
     questionText: string;
     type: string;
@@ -398,6 +453,7 @@ export class AdminExamRevisionService {
     passageId?: string;
     validationConfig?: object;
   }) {
+    await this.validateQuestionCategory(dto.examTypeSubjectId, dto.category);
     const q = this.questionRepo.create({
       ...dto,
       type: dto.type as QuestionType,
@@ -425,8 +481,14 @@ export class AdminExamRevisionService {
       isActive: boolean;
     }>,
   ) {
-    const q = await this.questionRepo.findOne({ where: { id } });
+    const q = await this.questionRepo.findOne({
+      where: { id },
+      relations: ['examTypeSubject', 'examTypeSubject.examType'],
+    });
     if (!q) throw new NotFoundException('Question not found');
+    const etsId = dto.examTypeSubjectId ?? q.examTypeSubjectId;
+    const category = dto.category ?? q.category;
+    await this.validateQuestionCategory(etsId, category);
     Object.assign(q, dto);
     return this.questionRepo.save(q);
   }

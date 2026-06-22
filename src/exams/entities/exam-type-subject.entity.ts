@@ -4,6 +4,7 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
+  ManyToMany,
   Index,
 } from 'typeorm';
 import { BaseEntity } from '../../common/entities';
@@ -53,6 +54,6 @@ export class ExamTypeSubject extends BaseEntity {
   @OneToMany('Question', 'examTypeSubject')
   questions: Question[];
 
-  @OneToMany('Passage', 'examTypeSubject')
+  @ManyToMany('Passage', 'examTypeSubjects')
   passages: Passage[];
 }

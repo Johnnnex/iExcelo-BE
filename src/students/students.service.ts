@@ -824,6 +824,16 @@ export class StudentsService {
             id: opt.id,
             text: opt.text,
           })),
+          ...(q.type === 'matching' && q.correctAnswer
+            ? {
+                matchingPrompts: Object.keys(
+                  q.correctAnswer as Record<string, string>,
+                ),
+                matchingOptions: Object.values(
+                  q.correctAnswer as Record<string, string>,
+                ),
+              }
+            : {}),
           correctAnswer: q.correctAnswer ?? null,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           studentAnswer: r?.answer ?? null,

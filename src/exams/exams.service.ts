@@ -980,6 +980,18 @@ export class ExamsService {
       difficulty: q.difficulty,
       passageId: q.passageId ?? null,
       options: q.options?.map((opt) => ({ id: opt.id, text: opt.text })) ?? [],
+      // Matching questions: always include both columns so the student can see
+      // the UI even in mock mode (the correct mapping is still hidden)
+      ...(q.type === 'matching' && q.correctAnswer
+        ? {
+            matchingPrompts: Object.keys(
+              q.correctAnswer as Record<string, string>,
+            ),
+            matchingOptions: Object.values(
+              q.correctAnswer as Record<string, string>,
+            ).sort(() => Math.random() - 0.5),
+          }
+        : {}),
       ...(includeAnswers && {
         correctAnswer: q.correctAnswer,
         topicId: q.topicId ?? null,

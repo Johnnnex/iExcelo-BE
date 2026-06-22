@@ -392,7 +392,7 @@ export class AdminExamRevisionController {
   @Post('passages')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
   createPassage(
-    @Body() body: { examTypeSubjectId: string; title: string; content: string },
+    @Body() body: { examTypeSubjectIds: string[]; title: string; content: string },
   ) {
     return this.examRevision.createPassage(body);
   }
