@@ -121,6 +121,7 @@ export class AdminExamRevisionService {
     name: string;
     description?: string;
     isActive?: boolean;
+    isAlsoPractical?: boolean;
   }) {
     const existing = await this.subjectRepo
       .createQueryBuilder('s')
@@ -134,7 +135,7 @@ export class AdminExamRevisionService {
 
   async updateSubject(
     id: string,
-    dto: Partial<{ name: string; description: string; isActive: boolean }>,
+    dto: Partial<{ name: string; description: string; isActive: boolean; isAlsoPractical: boolean }>,
   ) {
     const s = await this.subjectRepo.findOne({ where: { id } });
     if (!s) throw new NotFoundException('Subject not found');

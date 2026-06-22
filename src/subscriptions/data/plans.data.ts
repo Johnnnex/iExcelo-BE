@@ -52,6 +52,8 @@ export const planPricesData: Record<Currency, PlanPriceData[]> = {
   [Currency.EUR]: [{ amount: 5 }, { amount: 7 }, { amount: 9 }],
   [Currency.CAD]: [{ amount: 7 }, { amount: 10 }, { amount: 13 }],
   [Currency.AUD]: [{ amount: 8 }, { amount: 11 }, { amount: 14 }],
+  [Currency.GHS]: [{ amount: 75 }, { amount: 105 }, { amount: 135 }],
+  [Currency.GMD]: [{ amount: 350 }, { amount: 490 }, { amount: 630 }],
 };
 
 /**

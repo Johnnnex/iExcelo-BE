@@ -252,7 +252,7 @@ export class ExamsService {
       startedAt: new Date(),
       questionResponses: [],
       questionIds: questions.map((q) => q.id),
-      category: dto.category ?? null,
+      category: dto.category ?? undefined,
     });
 
     // 8. Serialize questions — return first page only (up to PAGE_SIZE)
