@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,7 +15,10 @@ import { Queue } from 'bullmq';
 import { LessThan, Repository } from 'typeorm';
 import { RefreshToken } from './entities/refresh-tokens.entity';
 import { PasswordResetToken } from './entities/password-reset-tokens.entity';
-import { EmailVerificationCode } from './entities/email-verification-codes.entity';
+import {
+  EmailVerificationCode,
+  VerificationCodePurpose,
+} from './entities/email-verification-codes.entity';
 import { OnboardingToken } from './entities/onboarding-token.entity';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
@@ -70,6 +78,7 @@ export class AuthService {
       isNewUser = true;
       user = await this.usersService.create({
         googleId: googleUser.googleId,
+        googleEmail: googleUser.email,
         email: googleUser.email,
         firstName: googleUser.firstName,
         lastName: googleUser.lastName,
@@ -84,20 +93,39 @@ export class AuthService {
     } else {
       // Existing user - check provider
       if (user.provider === AuthProvider.LOCAL) {
+        // Check if this googleId is already linked to a different account
+        const conflictUser = await this.usersService.findByGoogleId(
+          googleUser.googleId as string,
+        );
+        if (conflictUser && conflictUser.id !== user.id) {
+          throw new UnauthorizedException(
+            'This Google account is already connected to a different iExcelo account.',
+          );
+        }
+
         // User started with local, now adding Google -> Upgrade to DUAL
         user.googleId = googleUser.googleId;
+        user.googleEmail = googleUser.email;
         user.provider = AuthProvider.DUAL;
         user.picture = user.picture || googleUser.picture; // Update picture if not set
         await this.usersService.update(user.id, {
           googleId: user.googleId,
+          googleEmail: user.googleEmail,
           provider: user.provider,
           picture: user.picture,
         });
       } else {
-        // Already using Google/DUAL - just update googleId if changed
-        if (user.googleId !== googleUser.googleId) {
+        // Already using Google/DUAL - update googleId/googleEmail if changed
+        if (
+          user.googleId !== googleUser.googleId ||
+          user.googleEmail !== googleUser.email
+        ) {
           user.googleId = googleUser.googleId;
-          await this.usersService.update(user.id, { googleId: user.googleId });
+          user.googleEmail = googleUser.email;
+          await this.usersService.update(user.id, {
+            googleId: user.googleId,
+            googleEmail: user.googleEmail,
+          });
         }
       }
     }
@@ -608,6 +636,28 @@ export class AuthService {
     );
   }
 
+  // Build the full user object returned on login/exchange/onboarding (single source of truth)
+  private buildUserObject(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      picture: user.picture,
+      provider: user.provider,
+      googleId: user.googleId,
+      googleEmail: user.googleEmail,
+      phoneNumber: user.phoneNumber,
+      countryCode: user.countryCode,
+      emailVerified: user.emailVerified,
+      newsletterOptIn: user.newsletterOptIn,
+      promotionsOptIn: user.promotionsOptIn,
+      productUpdatesOptIn: user.productUpdatesOptIn,
+      securityAlertsOptIn: user.securityAlertsOptIn,
+    };
+  }
+
   // Local login — generates tokens, sets lastLogin, returns profile
   async loginUser(user: User, userAgent?: string, ipAddress?: string) {
     await this.usersService.update(user.id, { lastLogin: new Date() });
@@ -624,13 +674,7 @@ export class AuthService {
 
     return {
       ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
+      user: this.buildUserObject(user),
       profile,
     };
   }
@@ -662,13 +706,7 @@ export class AuthService {
 
     return {
       ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
+      user: this.buildUserObject(user),
       profile,
     };
   }
@@ -776,12 +814,13 @@ export class AuthService {
           }
         }
 
-        // Attach subjects to student's exam type
-        if (payload.subjectIds?.length && payload.examTypeId) {
+        // Attach subjects — always call so compulsory validation runs.
+        // Sending no subjects or an empty array is rejected inside updateExamTypeSubjects.
+        if (payload.examTypeId) {
           await this.studentsService.updateExamTypeSubjects(
             profile.id,
             payload.examTypeId,
-            payload.subjectIds,
+            payload.subjectIds ?? [],
           );
         }
 
@@ -896,17 +935,12 @@ export class AuthService {
     const tokens = await this.generateTokens(user, userAgent, ipAddress);
     const profileData = await this.getProfileData(user);
 
+    // Re-fetch user to get latest data (role may have been updated above)
+    const freshUser = await this.usersService.findById(user.id);
+
     return {
       ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        phoneNumber: user.phoneNumber,
-        countryCode: user.countryCode,
-      },
+      user: this.buildUserObject(freshUser ?? user),
       profile: profileData,
     };
   }
@@ -1038,6 +1072,15 @@ export class AuthService {
    * while keeping refresh token management in the database. For now, this DB lookup ensures consistency.
    */
   async validateAccessTokenPayload(payload: TokenPayload): Promise<User> {
+    // Admin tokens have no refreshTokenId — validate by user lookup only.
+    if (!payload.refreshTokenId) {
+      const user = await this.usersService.findById(payload.sub);
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('User account not found or inactive');
+      }
+      return user;
+    }
+
     const refreshToken = await this.refreshTokenRepo.findOne({
       where: { id: payload.refreshTokenId },
       relations: [
@@ -1297,5 +1340,282 @@ export class AuthService {
     });
 
     return { message: 'Password reset successful. Please login again.' };
+  }
+
+  // ─── Account Settings ────────────────────────────────────────────────────────
+
+  async updateProfile(
+    userId: string,
+    dto: {
+      firstName?: string;
+      lastName?: string;
+      phoneNumber?: string;
+      countryCode?: string;
+      picture?: string;
+    },
+  ): Promise<User> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+    return this.usersService.update(userId, dto);
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    if (user.provider === AuthProvider.GOOGLE) {
+      throw new UnauthorizedException(
+        'Google-only accounts cannot change password. Use "Set Password" via forgot-password flow.',
+      );
+    }
+
+    if (!user.password) {
+      throw new UnauthorizedException('No password set on this account');
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await this.usersService.update(userId, { password: hashed });
+    // Revoke all sessions — user must re-login
+    await this.logoutAll(userId);
+
+    return { message: 'Password changed successfully. Please log in again.' };
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    dto: {
+      newsletterOptIn?: boolean;
+      promotionsOptIn?: boolean;
+      productUpdatesOptIn?: boolean;
+      securityAlertsOptIn?: boolean;
+    },
+  ): Promise<User> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+    return this.usersService.update(userId, dto);
+  }
+
+  async disconnectGoogle(userId: string): Promise<{ message: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    if (user.provider !== AuthProvider.DUAL) {
+      throw new UnauthorizedException(
+        'Google is not connected to this account',
+      );
+    }
+
+    if (!user.password) {
+      throw new UnauthorizedException(
+        'Set a password before disconnecting Google',
+      );
+    }
+
+    await this.usersService.update(userId, {
+      provider: AuthProvider.LOCAL,
+      googleId: null as any,
+      googleEmail: null as any,
+    });
+
+    return { message: 'Google account disconnected successfully' };
+  }
+
+  async deleteAccount(userId: string): Promise<{ message: string }> {
+    await this.logoutAll(userId);
+    await this.usersService.remove(userId);
+    return { message: 'Account deleted successfully' };
+  }
+
+  // ── Set Password (for Google-only accounts) ──────────────────────────────────
+
+  async requestSetPassword(userId: string): Promise<{ message: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    if (user.provider !== AuthProvider.GOOGLE) {
+      throw new UnauthorizedException(
+        'This endpoint is only for Google-only accounts. Use change-password instead.',
+      );
+    }
+
+    // Check for an existing active (unused, not expired) code for this user
+    const activeCode = await this.emailVerificationCodeRepo.findOne({
+      where: {
+        userId: user.id,
+        purpose: VerificationCodePurpose.SET_PASSWORD,
+        used: false,
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (activeCode && new Date() < activeCode.expiresAt) {
+      // ── Resend same code ───────────────────────────────────────────────────
+      // sentCount = how many emails have been sent so far (1 = initial send)
+      // Cooldown before next send: 30s → 1m → 2m → 4m → 8m → 16m → 32m → 1hr → 24hr → blocked
+      const sent = activeCode.sentCount;
+
+      if (sent >= 10) {
+        throw new HttpException(
+          'Too many attempts. Please use your current verification code or wait for it to expire.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      const cooldownSeconds =
+        sent === 9 ? 86400 : Math.min(30 * Math.pow(2, sent - 1), 3600);
+      const elapsedMs = Date.now() - new Date(activeCode.lastSentAt).getTime();
+
+      if (elapsedMs < cooldownSeconds * 1000) {
+        const remaining = Math.ceil(
+          (cooldownSeconds * 1000 - elapsedMs) / 1000,
+        );
+        throw new HttpException(
+          `Please wait ${remaining} second${remaining === 1 ? '' : 's'} before requesting a new code.`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      // Resend the same code — just update tracking fields
+      activeCode.sentCount += 1;
+      activeCode.lastSentAt = new Date();
+      await this.emailVerificationCodeRepo.save(activeCode);
+
+      await this.emailQueue.add(
+        EmailJobs.SEND_SET_PASSWORD,
+        { email: user.email, firstName: user.firstName, code: activeCode.code },
+        { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
+      );
+
+      return { message: 'Verification code resent to your email' };
+    }
+
+    // ── Generate fresh code (no active code, or previous one expired) ─────────
+    // Expire any leftover unused codes (edge case: code expired but not marked used)
+    await this.emailVerificationCodeRepo.update(
+      {
+        userId: user.id,
+        purpose: VerificationCodePurpose.SET_PASSWORD,
+        used: false,
+      },
+      { used: true },
+    );
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeRecord = this.emailVerificationCodeRepo.create({
+      code,
+      userId: user.id,
+      purpose: VerificationCodePurpose.SET_PASSWORD,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+    });
+    await this.emailVerificationCodeRepo.save(codeRecord);
+
+    await this.emailQueue.add(
+      EmailJobs.SEND_SET_PASSWORD,
+      { email: user.email, firstName: user.firstName, code },
+      { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
+    );
+
+    return { message: 'Verification code sent to your email' };
+  }
+
+  async confirmSetPassword(
+    userId: string,
+    code: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    if (user.provider !== AuthProvider.GOOGLE) {
+      throw new UnauthorizedException(
+        'This endpoint is only for Google-only accounts.',
+      );
+    }
+
+    const codeRecord = await this.emailVerificationCodeRepo.findOne({
+      where: {
+        userId: user.id,
+        code,
+        purpose: VerificationCodePurpose.SET_PASSWORD,
+        used: false,
+      },
+    });
+
+    if (!codeRecord) {
+      throw new UnauthorizedException('Invalid verification code');
+    }
+
+    if (new Date() > codeRecord.expiresAt) {
+      throw new UnauthorizedException(
+        'Verification code has expired. Please request a new one.',
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.usersService.update(userId, {
+      password: hashedPassword,
+      provider: AuthProvider.DUAL,
+    });
+
+    codeRecord.used = true;
+    await this.emailVerificationCodeRepo.save(codeRecord);
+
+    return {
+      message:
+        'Password set successfully. You can now sign in with email and password.',
+    };
+  }
+
+  // ── Connect Google (for already-authenticated users) ──────────────────────────
+
+  async connectGoogleToUser(
+    userId: string,
+    googleId: string,
+    googleEmail?: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    // Account already has Google connected (via provider field)
+    if (
+      user.provider === AuthProvider.GOOGLE ||
+      user.provider === AuthProvider.DUAL
+    ) {
+      throw new UnauthorizedException(
+        'Google is already connected to this account',
+      );
+    }
+
+    // Defensive: account has a different googleId stored even if provider hasn't been updated
+    if (user.googleId && user.googleId !== googleId) {
+      throw new UnauthorizedException(
+        'This account already has a different Google account associated with it',
+      );
+    }
+
+    // The incoming Google account is already linked to a different iExcelo account
+    const existing = await this.usersService.findByGoogleId(googleId);
+    if (existing && existing.id !== userId) {
+      throw new UnauthorizedException(
+        'This Google account is already connected to a different iExcelo account',
+      );
+    }
+
+    await this.usersService.update(userId, {
+      googleId,
+      googleEmail: googleEmail ?? null,
+      provider: AuthProvider.DUAL,
+    });
+
+    return { message: 'Google account connected successfully' };
   }
 }

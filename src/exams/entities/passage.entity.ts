@@ -1,10 +1,4 @@
-import {
-  Entity,
-  Column,
-  ManyToMany,
-  JoinTable,
-  OneToMany,
-} from 'typeorm';
+import { Entity, Column, ManyToMany, JoinTable, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../common/entities';
 import { ExamTypeSubject } from './exam-type-subject.entity';
 import { Question } from './question.entity';
@@ -35,7 +29,10 @@ export class Passage extends BaseEntity {
   @JoinTable({
     name: 'passage_exam_type_subjects',
     joinColumn: { name: 'passageId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'examTypeSubjectId', referencedColumnName: 'id' },
+    inverseJoinColumn: {
+      name: 'examTypeSubjectId',
+      referencedColumnName: 'id',
+    },
   })
   examTypeSubjects: ExamTypeSubject[];
 

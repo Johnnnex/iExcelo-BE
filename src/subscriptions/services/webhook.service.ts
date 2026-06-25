@@ -159,6 +159,14 @@ export class WebhookService {
     },
     customerInfo?: { customerCode?: string; email?: string },
     paymentData?: { amount?: number; currency?: string },
+    cardInfo?: {
+      brand?: string | null;
+      last4?: string | null;
+      expMonth?: string | null;
+      expYear?: string | null;
+      bank?: string | null;
+      channel?: string | null;
+    },
   ): Promise<void> {
     // Try to find existing transaction (created at checkout)
     let transaction =
@@ -235,6 +243,18 @@ export class WebhookService {
         );
       } else {
         await this.subscriptionsService.activateSubscription(subscriptionId);
+      }
+
+      // Persist card info so billing history can show it without extra API calls
+      if (cardInfo?.last4) {
+        await this.subscriptionsService.updateCardInfo(subscriptionId, {
+          cardBrand: cardInfo.brand || undefined,
+          cardLast4: cardInfo.last4 || undefined,
+          cardExpMonth: cardInfo.expMonth || undefined,
+          cardExpYear: cardInfo.expYear || undefined,
+          cardBank: cardInfo.bank || undefined,
+          cardChannel: cardInfo.channel || undefined,
+        });
       }
     }
 
@@ -320,6 +340,14 @@ export class WebhookService {
       amount: number;
       currency: string;
       reference?: string;
+      cardInfo?: {
+        brand?: string | null;
+        last4?: string | null;
+        expMonth?: string | null;
+        expYear?: string | null;
+        bank?: string | null;
+        channel?: string | null;
+      };
     },
   ): Promise<void> {
     const subscription =
@@ -348,6 +376,18 @@ export class WebhookService {
         providerTransactionId: data.reference,
         providerCustomerId: subscription.providerCustomerId,
       });
+
+      // Update card info if a new authorization was provided on renewal
+      if (data.cardInfo?.last4) {
+        await this.subscriptionsService.updateCardInfo(subscription.id, {
+          cardBrand: data.cardInfo.brand || undefined,
+          cardLast4: data.cardInfo.last4 || undefined,
+          cardExpMonth: data.cardInfo.expMonth || undefined,
+          cardExpYear: data.cardInfo.expYear || undefined,
+          cardBank: data.cardInfo.bank || undefined,
+          cardChannel: data.cardInfo.channel || undefined,
+        });
+      }
 
       this.logger.log(
         `Subscription renewed: ${subscription.id} (${data.subscriptionCode})`,

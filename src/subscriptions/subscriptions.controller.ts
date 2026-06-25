@@ -111,6 +111,33 @@ export class SubscriptionsController {
   // === AUTHENTICATED ROUTES ===
 
   /**
+   * Get paginated billing history (transactions)
+   * GET /subscriptions/billing-history?page=1&limit=20
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('billing-history')
+  async getBillingHistory(
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+    @Req() req: Request & { user: User },
+  ) {
+    const studentId = req.user.studentProfile?.id;
+    if (!studentId) throw new BadRequestException('Student profile not found');
+
+    const result = await this.subscriptionsService.getBillingHistory(
+      studentId,
+      parseInt(page, 10),
+      Math.min(parseInt(limit, 10), 50),
+    );
+
+    return {
+      success: true,
+      message: 'Billing history retrieved',
+      data: result,
+    };
+  }
+
+  /**
    * Create a checkout session for subscription
    * POST /subscriptions/checkout
    */
@@ -219,6 +246,56 @@ export class SubscriptionsController {
   }
 
   /**
+   * All current subscriptions across exam types — used by billing page overview.
+   * GET /subscriptions/my-subscriptions
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('my-subscriptions')
+  async getMySubscriptions(@Req() req: Request & { user: User }) {
+    const studentId = req.user.studentProfile?.id;
+    if (!studentId) {
+      throw new BadRequestException('Student profile not found');
+    }
+
+    const subs =
+      await this.subscriptionsService.findAllCurrentSubscriptions(studentId);
+
+    return {
+      success: true,
+      data: subs.map((sub) => ({
+        id: sub.id,
+        examTypeId: sub.examTypeId,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        examTypeName: (sub.examType as any)?.name ?? null,
+        planId: sub.planId,
+        status: sub.status,
+        amountPaid: sub.amountPaid,
+        currency: sub.currency,
+        paymentProvider: sub.paymentProvider,
+        startDate: sub.startDate,
+        endDate: sub.endDate,
+        autoRenew: sub.autoRenew,
+        providerSubscriptionId: sub.providerSubscriptionId,
+        cancelledAt: sub.cancelledAt,
+        plan: sub.plan
+          ? {
+              id: sub.plan.id,
+              name: sub.plan.name,
+              durationDays: sub.plan.durationDays,
+            }
+          : null,
+        isSponsored: !!sub.givebackId,
+        cardBrand: sub.givebackId ? null : sub.cardBrand,
+        cardLast4: sub.givebackId ? null : sub.cardLast4,
+        cardExpMonth: sub.givebackId ? null : sub.cardExpMonth,
+        cardExpYear: sub.givebackId ? null : sub.cardExpYear,
+        cardBank: sub.givebackId ? null : sub.cardBank,
+        cardChannel: sub.givebackId ? null : sub.cardChannel,
+      })),
+    };
+  }
+
+  /**
    * Get the student's active subscription for an exam type
    * GET /subscriptions/my-subscription?examTypeId=xxx
    */
@@ -317,6 +394,20 @@ export class SubscriptionsController {
                   description: subscription.plan.description,
                 }
               : null,
+            // Card info from DB — avoids external API call at billing page load
+            isSponsored: !!subscription.givebackId,
+            cardBrand: subscription.givebackId ? null : subscription.cardBrand,
+            cardLast4: subscription.givebackId ? null : subscription.cardLast4,
+            cardExpMonth: subscription.givebackId
+              ? null
+              : subscription.cardExpMonth,
+            cardExpYear: subscription.givebackId
+              ? null
+              : subscription.cardExpYear,
+            cardBank: subscription.givebackId ? null : subscription.cardBank,
+            cardChannel: subscription.givebackId
+              ? null
+              : subscription.cardChannel,
           }
         : null,
     };
@@ -343,13 +434,31 @@ export class SubscriptionsController {
         examTypeId,
       );
 
-    if (!subscription?.providerSubscriptionId) {
+    if (!subscription) {
       return { success: true, message: 'No card info available', data: null };
     }
 
-    const cardInfo = await this.subscriptionsService.fetchPaystackSubscription(
-      subscription.providerSubscriptionId,
-    );
+    // If this was a sponsored subscription, card info won't be present
+    if (subscription.givebackId) {
+      return {
+        success: true,
+        message: 'Sponsored subscription',
+        data: { isSponsored: true, givebackId: subscription.givebackId },
+      };
+    }
+
+    const cardInfo = subscription.cardLast4
+      ? {
+          brand: subscription.cardBrand,
+          last4: subscription.cardLast4,
+          expMonth: subscription.cardExpMonth,
+          expYear: subscription.cardExpYear,
+          bank: subscription.cardBank,
+          channel: subscription.cardChannel,
+          provider: subscription.paymentProvider,
+          isSponsored: false,
+        }
+      : null;
 
     return {
       success: true,

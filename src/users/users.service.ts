@@ -33,6 +33,10 @@ export class UsersService {
     return this.userRepo.findOne({ where: { email } });
   }
 
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return this.userRepo.findOne({ where: { googleId } });
+  }
+
   async findByIdWithProfile(id: string): Promise<User | null> {
     const user = await this.userRepo.findOne({
       where: { id },
@@ -61,14 +65,19 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.findById(id);
+    // Strip undefined so only explicitly-provided fields are touched.
+    // Object.assign with undefined values would overwrite existing DB data with NULL.
+    const updates = Object.fromEntries(
+      Object.entries(updateUserDto).filter(([, v]) => v !== undefined),
+    );
 
-    if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+    if (Object.keys(updates).length > 0) {
+      await this.userRepo.update(id, updates as any);
     }
 
-    Object.assign(user, updateUserDto);
-    return this.userRepo.save(user);
+    const user = await this.findById(id);
+    if (!user) throw new NotFoundException(`User with ID ${id} not found`);
+    return user;
   }
 
   async remove(id: string): Promise<void> {

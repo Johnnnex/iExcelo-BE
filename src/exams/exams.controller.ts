@@ -147,9 +147,16 @@ export class ExamsController {
   async searchTopics(
     @Query('examTypeId') examTypeId: string,
     @Query('q') q: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    const topics = await this.examsService.searchTopics(examTypeId, q);
-    return { message: 'Topics retrieved', data: topics };
+    const result = await this.examsService.searchTopics(
+      examTypeId,
+      q,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+    );
+    return { message: 'Topics retrieved', data: result };
   }
 
   @Get('types/:examTypeId/topics')

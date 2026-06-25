@@ -34,7 +34,7 @@ import { AdminMessagesService } from './admin-messages.service';
 import { AdminAnalyticsService } from './admin-analytics.service';
 import { SubscriptionStatus } from '../../types';
 import { FlagStatus } from '../chats/entities/message-flag.entity';
-import { CampaignTargetAudience } from './entities/bulk-email-campaign.entity';
+import { CampaignCategory } from './entities/bulk-email-campaign.entity';
 
 // ─── Auth (no guard) ───────────────────────────────────────────────────────────
 
@@ -378,13 +378,13 @@ export class AdminExamRevisionController {
   listPassages(
     @Query('page') page = '1',
     @Query('limit') limit = '50',
-    @Query('examTypeSubjectId') examTypeSubjectId?: string,
+    @Query('etsIds') etsIds?: string,
     @Query('search') search?: string,
   ) {
     return this.examRevision.listPassages({
       page: Number(page),
       limit: Number(limit),
-      examTypeSubjectId,
+      etsIds: etsIds ? etsIds.split(',').filter(Boolean) : undefined,
       search,
     });
   }
@@ -392,7 +392,12 @@ export class AdminExamRevisionController {
   @Post('passages')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
   createPassage(
-    @Body() body: { examTypeSubjectIds: string[]; title: string; content: string },
+    @Body()
+    body: {
+      examTypeSubjectIds: string[];
+      title: string;
+      content: string;
+    },
   ) {
     return this.examRevision.createPassage(body);
   }
@@ -593,7 +598,12 @@ export class AdminAffiliatesController {
     @Query('cursor') cursor?: string,
     @Query('userType') userType?: string,
   ) {
-    return this.usersService.listAffiliates(Number(limit), search, cursor, userType);
+    return this.usersService.listAffiliates(
+      Number(limit),
+      search,
+      cursor,
+      userType,
+    );
   }
 
   @Patch(':userId/deactivate')
@@ -868,14 +878,16 @@ export class AdminBulkEmailsController {
       name: string;
       subject: string;
       content: string;
-      targetAudience: CampaignTargetAudience;
+      category: CampaignCategory;
+      targetAudiences: string[];
     },
   ) {
     const dto: CampaignDto = {
       name: body.name,
       subject: body.subject,
       content: body.content,
-      targetAudience: body.targetAudience,
+      category: body.category ?? CampaignCategory.NEWSLETTER,
+      targetAudiences: body.targetAudiences ?? ['all'],
     };
     return this.bulkEmailsService.createCampaign(dto, req.user.sub);
   }
@@ -889,7 +901,8 @@ export class AdminBulkEmailsController {
       name: string;
       subject: string;
       content: string;
-      targetAudience: CampaignTargetAudience;
+      category: CampaignCategory;
+      targetAudiences: string[];
     }>,
   ) {
     return this.bulkEmailsService.updateCampaign(id, body);

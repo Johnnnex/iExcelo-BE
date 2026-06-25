@@ -85,7 +85,26 @@ export class Subscription extends BaseEntity {
 
   // Giveback link — set when this subscription was created by a sponsor giveback action
   @Column({ nullable: true, type: 'varchar' })
-  givebackId: string | null;
+  givebackId: string;
+
+  // Card info saved at payment time — null for sponsored (giveback) subscriptions
+  @Column({ nullable: true, type: 'varchar' })
+  cardBrand: string;
+
+  @Column({ nullable: true, type: 'varchar' })
+  cardLast4: string;
+
+  @Column({ nullable: true, type: 'varchar' })
+  cardExpMonth: string;
+
+  @Column({ nullable: true, type: 'varchar' })
+  cardExpYear: string;
+
+  @Column({ nullable: true, type: 'varchar' })
+  cardBank: string;
+
+  @Column({ nullable: true, type: 'varchar' })
+  cardChannel: string;
 
   // Relations
   @ManyToOne(() => StudentProfile, (profile) => profile.subscriptions, {

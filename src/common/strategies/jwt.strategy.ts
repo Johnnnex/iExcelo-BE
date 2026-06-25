@@ -29,7 +29,15 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid token or session expired');
     }
 
-    // Return full user object - it will be attached to req.user
-    return user;
+    // Attach userId alias and refreshTokenId from the JWT payload so controllers
+    // can read req.user.userId and req.user.refreshTokenId reliably.
+    // The User entity only has `id`; without this alias every updateProfile call
+    // was passing `undefined` as the userId (TypeORM then dropped the WHERE clause
+    // and matched the first row in the table — corrupting records).
+    return {
+      ...user,
+      userId: user.id,
+      refreshTokenId: payload.refreshTokenId ?? null,
+    };
   }
 }

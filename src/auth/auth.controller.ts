@@ -4,6 +4,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Body,
   Req,
   Res,
@@ -32,6 +34,11 @@ import {
   ResetPasswordDto,
   ActivateSponsoredAccountDto,
 } from './dto/create-auth.dto';
+import {
+  UpdateProfileDto,
+  ChangePasswordDto,
+  UpdateNotificationPrefsDto,
+} from './dto/settings.dto';
 import { Param } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
@@ -117,26 +124,37 @@ export class AuthController {
   async googleAuthRedirect(
     @Req()
     req: Request & {
-      user: User & { _isNewUser?: boolean; _needsOnboarding?: boolean };
+      user: User & {
+        _isNewUser?: boolean;
+        _needsOnboarding?: boolean;
+        _connectResult?: { message: string };
+        _connectUserId?: string;
+      };
     },
     @Res() res: Response,
   ) {
     const frontendUrl = this.configService.get('FRONTEND_URL');
 
-    // Check if user needs onboarding (new user or no profile)
+    // Connect flow — linked successfully, redirect back to security settings
+    if (req.user._connectResult) {
+      return res.redirect(
+        `${frontendUrl}/student/settings/password?connected=true`,
+      );
+    }
+
+    // Login / signup flow
     if (req.user._needsOnboarding) {
-      // Get existing onboarding token (created during signup, won't send email again)
       const onboardingToken = await this.authService.getOrCreateOnboardingToken(
         req.user.id,
         req.user.email,
       );
-      // Redirect to onboarding with the token
-      res.redirect(`${frontendUrl}/auth/onboarding?token=${onboardingToken}`);
-    } else {
-      // Existing user with profile - generate exchange token for callback
-      const exchangeToken = this.authService.generateExchangeToken(req.user.id);
-      res.redirect(`${frontendUrl}/auth/callback?token=${exchangeToken}`);
+      return res.redirect(
+        `${frontendUrl}/auth/onboarding?token=${onboardingToken}`,
+      );
     }
+
+    const exchangeToken = this.authService.generateExchangeToken(req.user.id);
+    return res.redirect(`${frontendUrl}/auth/callback?token=${exchangeToken}`);
   }
 
   @Public()
@@ -274,6 +292,125 @@ export class AuthController {
       success: true,
       message: result.message,
     };
+  }
+
+  // ========== Account Settings ==========
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateProfile(
+    @Req() req: Request & { user: User & { userId: string } },
+    @Body() body: UpdateProfileDto,
+  ) {
+    const user = await this.authService.updateProfile(req.user.userId, body);
+    return {
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumber,
+        countryCode: user.countryCode,
+        picture: user.picture,
+        provider: user.provider,
+        googleId: user.googleId,
+        newsletterOptIn: user.newsletterOptIn,
+        promotionsOptIn: user.promotionsOptIn,
+        productUpdatesOptIn: user.productUpdatesOptIn,
+        securityAlertsOptIn: user.securityAlertsOptIn,
+      },
+    };
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Req() req: Request & { user: User & { userId: string } },
+    @Body() body: ChangePasswordDto,
+  ) {
+    const result = await this.authService.changePassword(
+      req.user.userId,
+      body.currentPassword,
+      body.newPassword,
+    );
+    return { success: true, message: result.message };
+  }
+
+  @Patch('notification-preferences')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateNotificationPreferences(
+    @Req() req: Request & { user: User & { userId: string } },
+    @Body() body: UpdateNotificationPrefsDto,
+  ) {
+    const user = await this.authService.updateNotificationPreferences(
+      req.user.userId,
+      body,
+    );
+    return {
+      success: true,
+      message: 'Notification preferences updated',
+      data: {
+        newsletterOptIn: user.newsletterOptIn,
+        promotionsOptIn: user.promotionsOptIn,
+        productUpdatesOptIn: user.productUpdatesOptIn,
+        securityAlertsOptIn: user.securityAlertsOptIn,
+      },
+    };
+  }
+
+  @Delete('google')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async disconnectGoogle(
+    @Req() req: Request & { user: User & { userId: string } },
+  ) {
+    const result = await this.authService.disconnectGoogle(req.user.userId);
+    return { success: true, message: result.message };
+  }
+
+  @Delete('account')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async deleteAccount(
+    @Req() req: Request & { user: User & { userId: string } },
+  ) {
+    const result = await this.authService.deleteAccount(req.user.userId);
+    return { success: true, message: result.message };
+  }
+
+  // ========== Set Password (Google-only accounts) ==========
+
+  @Post('set-password/request')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async requestSetPassword(
+    @Req() req: Request & { user: User & { userId: string } },
+  ) {
+    const result = await this.authService.requestSetPassword(req.user.userId);
+    return { success: true, message: result.message };
+  }
+
+  @Post('set-password/confirm')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async confirmSetPassword(
+    @Req() req: Request & { user: User & { userId: string } },
+    @Body() body: { code: string; newPassword: string },
+  ) {
+    if (!body.code || !body.newPassword || body.newPassword.length < 8) {
+      throw new UnauthorizedException('Invalid request body');
+    }
+    const result = await this.authService.confirmSetPassword(
+      req.user.userId,
+      body.code,
+      body.newPassword,
+    );
+    return { success: true, message: result.message };
   }
 
   // ========== Sponsored Student Activation ==========

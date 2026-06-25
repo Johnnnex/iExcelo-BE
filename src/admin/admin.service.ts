@@ -191,7 +191,7 @@ export class AdminService {
       firstName,
       lastName,
       token: hashed,
-      roleId,
+      roleId: roleId ?? undefined,
       modulePermissions,
       createdById: profile.id,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),

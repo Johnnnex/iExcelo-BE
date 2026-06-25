@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as webpush from 'web-push';
+import { v7 as uuidv7 } from 'uuid';
 import { PushSubscription } from './push-subscription.entity';
 
 export interface PushPayload {
@@ -49,23 +50,13 @@ export class PushService implements OnModuleInit {
     auth: string,
     userAgent?: string,
   ): Promise<PushSubscription> {
-    const existing = await this.pushSubRepo.findOne({ where: { endpoint } });
-    if (existing) {
-      // Update userId (e.g. after re-login on same browser)
-      existing.userId = userId;
-      existing.p256dh = p256dh;
-      existing.auth = auth;
-      if (userAgent) existing.userAgent = userAgent;
-      return this.pushSubRepo.save(existing);
-    }
-    const sub = this.pushSubRepo.create({
-      userId,
-      endpoint,
-      p256dh,
-      auth,
-      userAgent: userAgent ?? undefined,
-    });
-    return this.pushSubRepo.save(sub);
+    // Generate id here so upsert has it on INSERT — @BeforeInsert() doesn't fire on upsert()
+    const id = uuidv7();
+    await this.pushSubRepo.upsert(
+      { id, userId, endpoint, p256dh, auth, userAgent: userAgent ?? undefined },
+      { conflictPaths: ['endpoint'], skipUpdateIfNoValuesChanged: true },
+    );
+    return this.pushSubRepo.findOneOrFail({ where: { endpoint } });
   }
 
   async deleteSubscription(userId: string, endpoint: string): Promise<void> {

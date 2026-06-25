@@ -9,8 +9,8 @@ import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
 import {
   BulkEmailCampaign,
+  CampaignCategory,
   CampaignStatus,
-  CampaignTargetAudience,
 } from './entities/bulk-email-campaign.entity';
 import { AdminProfile } from './entities/admin-profile.entity';
 import { User } from '../users/entities/user.entity';
@@ -21,8 +21,17 @@ export interface CampaignDto {
   name: string;
   subject: string;
   content: string;
-  targetAudience: CampaignTargetAudience;
+  category: CampaignCategory;
+  targetAudiences: string[];
 }
+
+/** Map category → user opt-in column name */
+const CATEGORY_OPT_IN_COLUMN: Record<CampaignCategory, keyof User | null> = {
+  [CampaignCategory.NEWSLETTER]: 'newsletterOptIn',
+  [CampaignCategory.PROMOTIONS]: 'promotionsOptIn',
+  [CampaignCategory.PRODUCT_UPDATES]: 'productUpdatesOptIn',
+  [CampaignCategory.SECURITY_ALERTS]: 'securityAlertsOptIn',
+};
 
 @Injectable()
 export class AdminBulkEmailsService {
@@ -53,7 +62,13 @@ export class AdminBulkEmailsService {
     if (!profile) throw new NotFoundException('Admin profile not found');
 
     const campaign = this.campaignRepo.create({
-      ...dto,
+      name: dto.name,
+      subject: dto.subject,
+      content: dto.content,
+      category: dto.category,
+      targetAudiences: dto.targetAudiences?.length
+        ? dto.targetAudiences
+        : ['all'],
       status: CampaignStatus.DRAFT,
       createdById: profile.id,
     });
@@ -65,6 +80,9 @@ export class AdminBulkEmailsService {
     if (!campaign) throw new NotFoundException('Campaign not found');
     if (campaign.status !== CampaignStatus.DRAFT) {
       throw new BadRequestException('Only draft campaigns can be edited');
+    }
+    if (dto.targetAudiences !== undefined && !dto.targetAudiences.length) {
+      dto.targetAudiences = ['all'];
     }
     Object.assign(campaign, dto);
     return this.campaignRepo.save(campaign);
@@ -87,7 +105,10 @@ export class AdminBulkEmailsService {
       throw new BadRequestException('Campaign has already been sent or queued');
     }
 
-    const users = await this.getTargetUsers(campaign.targetAudience);
+    const users = await this.getTargetUsers(
+      campaign.targetAudiences,
+      campaign.category,
+    );
 
     campaign.status = CampaignStatus.QUEUED;
     campaign.recipientCount = users.length;
@@ -100,6 +121,7 @@ export class AdminBulkEmailsService {
         firstName: user.firstName,
         subject: campaign.subject,
         htmlContent: campaign.content,
+        category: campaign.category,
       },
     }));
 
@@ -112,22 +134,35 @@ export class AdminBulkEmailsService {
     return { message: 'Campaign sent', recipientCount: users.length };
   }
 
-  private getTargetUsers(audience: CampaignTargetAudience): Promise<User[]> {
+  private getTargetUsers(
+    audiences: string[],
+    category: CampaignCategory,
+  ): Promise<User[]> {
     const qb = this.userRepo
       .createQueryBuilder('u')
       .select(['u.id', 'u.email', 'u.firstName'])
       .where('u.isActive = true')
       .andWhere('u.emailVerified = true');
 
-    const audienceRoleMap: Partial<Record<CampaignTargetAudience, UserType>> = {
-      [CampaignTargetAudience.STUDENTS]: UserType.STUDENT,
-      [CampaignTargetAudience.SPONSORS]: UserType.SPONSOR,
-      [CampaignTargetAudience.AFFILIATES]: UserType.AFFILIATE,
-    };
+    // Filter by subscription opt-in for this category
+    const optInColumn = CATEGORY_OPT_IN_COLUMN[category];
+    if (optInColumn) {
+      qb.andWhere(`u.${optInColumn} = true`);
+    }
 
-    if (audience !== CampaignTargetAudience.ALL) {
-      const role = audienceRoleMap[audience];
-      if (role) qb.andWhere('u.role = :role', { role });
+    // Filter by role(s) — 'all' means no role filter
+    const rolesMap: Record<string, UserType> = {
+      students: UserType.STUDENT,
+      sponsors: UserType.SPONSOR,
+      affiliates: UserType.AFFILIATE,
+    };
+    const targetRoles = audiences
+      .filter((a) => a !== 'all')
+      .map((a) => rolesMap[a])
+      .filter(Boolean);
+
+    if (targetRoles.length > 0) {
+      qb.andWhere('u.role IN (:...roles)', { roles: targetRoles });
     }
 
     return qb.getMany();

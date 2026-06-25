@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  ManyToMany,
+  JoinTable,
+} from 'typeorm';
 import { ExamTypeSubject } from './exam-type-subject.entity';
 import { Passage } from './passage.entity';
 import { Topic } from './topic.entity';
@@ -11,10 +18,6 @@ import { BaseEntity } from '../../common/entities';
 
 @Entity('questions')
 export class Question extends BaseEntity {
-  // FK to the explicit ExamTypeSubject join entity (e.g. "JAMB Mathematics")
-  @Column()
-  examTypeSubjectId: string;
-
   // Optional: link to a shared reading passage
   @Column({ nullable: true })
   passageId: string;
@@ -104,11 +107,18 @@ export class Question extends BaseEntity {
 
   // ─── Relations ────────────────────────────────────────────────────────────
 
-  @ManyToOne(() => ExamTypeSubject, (ets) => ets.questions, {
-    onDelete: 'CASCADE',
+  // Many-to-many with ExamTypeSubject — one question can appear in multiple
+  // exam types (e.g. WAEC, NECO, GCE) without being duplicated.
+  @ManyToMany(() => ExamTypeSubject, (ets) => ets.questions)
+  @JoinTable({
+    name: 'question_exam_type_subjects',
+    joinColumn: { name: 'questionId', referencedColumnName: 'id' },
+    inverseJoinColumn: {
+      name: 'examTypeSubjectId',
+      referencedColumnName: 'id',
+    },
   })
-  @JoinColumn({ name: 'examTypeSubjectId' })
-  examTypeSubject: ExamTypeSubject;
+  examTypeSubjects: ExamTypeSubject[];
 
   @ManyToOne(() => Passage, (passage) => passage.questions, {
     onDelete: 'SET NULL',

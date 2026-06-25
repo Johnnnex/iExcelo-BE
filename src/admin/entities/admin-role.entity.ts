@@ -35,8 +35,8 @@ export class AdminRole extends BaseEntity {
   @Column({ type: 'jsonb', default: {} })
   modules: ModulePermissionsMap;
 
-  @Column({ nullable: true })
-  createdById: string | null;
+  @Column({ nullable: true, type: 'varchar' })
+  createdById: string;
 
   @ManyToOne('AdminProfile', { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'createdById' })

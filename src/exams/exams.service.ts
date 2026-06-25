@@ -345,11 +345,11 @@ export class ExamsService {
         ? ExamAttemptStatus.AUTO_SUBMITTED
         : ExamAttemptStatus.COMPLETED;
 
-    // 4. Fetch questions with examTypeSubject relation (for analytics subjectId)
+    // 4. Fetch questions with examTypeSubjects relation (for analytics subjectId)
     const questionIds = dto.questionResponses.map((r) => r.questionId);
     const questions = await this.questionRepo.find({
       where: { id: In(questionIds) },
-      relations: ['examTypeSubject'],
+      relations: ['examTypeSubjects'],
     });
     const questionMap = new Map(questions.map((q) => [q.id, q]));
 
@@ -382,7 +382,7 @@ export class ExamsService {
         (Array.isArray(response.answer) && response.answer.length === 0);
       if (isEmpty) continue;
 
-      const subjectId = question.examTypeSubject?.subjectId;
+      const subjectId = question.examTypeSubjects?.[0]?.subjectId;
       const result = this.gradingService.gradeQuestion(
         question,
         response.answer,
@@ -557,16 +557,17 @@ export class ExamsService {
             selectedTopicIds,
           );
         }
-        return this.questionRepo.find({
-          where: {
-            examTypeSubjectId: ets.id,
-            isActive: true,
-            ...(category ? { category } : {}),
-          },
-          relations: ['passage', 'topic'],
-          order: { createdAt: 'ASC' },
-          take: quota,
-        });
+        const freeQb = this.questionRepo
+          .createQueryBuilder('q')
+          .leftJoinAndSelect('q.passage', 'passage')
+          .leftJoinAndSelect('q.topic', 'topic')
+          .innerJoin('q.examTypeSubjects', 'qets')
+          .where('qets.id = :etsId', { etsId: ets.id })
+          .andWhere('q.isActive = true')
+          .orderBy('q.createdAt', 'ASC')
+          .take(quota);
+        if (category) freeQb.andWhere('q.category = :category', { category });
+        return freeQb.getMany();
       }),
     );
 
@@ -651,7 +652,8 @@ export class ExamsService {
       .createQueryBuilder('q')
       .leftJoinAndSelect('q.passage', 'passage')
       .leftJoinAndSelect('q.topic', 'topic')
-      .where('q.examTypeSubjectId = :etsId', { etsId })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id = :etsId', { etsId })
       .andWhere('q.isActive = true')
       .andWhere('q.topicId IN (:...topicIds)', { topicIds })
       .orderBy('RANDOM()')
@@ -668,7 +670,8 @@ export class ExamsService {
       .createQueryBuilder('q')
       .leftJoinAndSelect('q.passage', 'passage')
       .leftJoinAndSelect('q.topic', 'topic')
-      .where('q.examTypeSubjectId = :etsId', { etsId })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id = :etsId', { etsId })
       .andWhere('q.isActive = true')
       .orderBy('RANDOM()')
       .limit(remaining);
@@ -700,7 +703,8 @@ export class ExamsService {
         'qp.questionId = q.id AND qp.studentId = :studentId',
         { studentId: studentId ?? '' },
       )
-      .where('q.examTypeSubjectId IN (:...etsIds)', { etsIds })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id IN (:...etsIds)', { etsIds })
       .andWhere('q.isActive = true')
       .andWhere('(qp.id IS NULL OR qp.timesAttempted = 0)')
       .orderBy('RANDOM()')
@@ -725,7 +729,8 @@ export class ExamsService {
         'qp.questionId = q.id AND qp.studentId = :studentId',
         { studentId: studentId ?? '' },
       )
-      .where('q.examTypeSubjectId IN (:...etsIds)', { etsIds })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id IN (:...etsIds)', { etsIds })
       .andWhere('q.isActive = true')
       .andWhere('qp.timesAttempted > 0')
       .orderBy('qp.timesWrong', 'DESC')
@@ -760,7 +765,8 @@ export class ExamsService {
         'fq.questionId = q.id AND fq.studentId = :studentId',
         { studentId: studentId ?? '' },
       )
-      .where('q.examTypeSubjectId IN (:...etsIds)', { etsIds })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id IN (:...etsIds)', { etsIds })
       .andWhere('q.isActive = true')
       .orderBy('fq.flaggedAt', 'DESC')
       .limit(total);
@@ -784,7 +790,8 @@ export class ExamsService {
         'qp.questionId = q.id AND qp.studentId = :studentId',
         { studentId: studentId ?? '' },
       )
-      .where('q.examTypeSubjectId IN (:...etsIds)', { etsIds })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id IN (:...etsIds)', { etsIds })
       .andWhere('q.isActive = true')
       .andWhere('(qp.id IS NULL OR qp.timesAttempted = 0)')
       .andWhere('q.id NOT IN (:...flaggedIds)', { flaggedIds })
@@ -817,7 +824,8 @@ export class ExamsService {
         'qp.questionId = q.id AND qp.studentId = :studentId',
         { studentId: studentId ?? '' },
       )
-      .where('q.examTypeSubjectId IN (:...etsIds)', { etsIds })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id IN (:...etsIds)', { etsIds })
       .andWhere('q.isActive = true')
       .andWhere('qp.timesAttempted > 0')
       .andWhere('(qp.timesWrong > qp.timesCorrect OR qp.timesWrong >= 2)')
@@ -871,7 +879,8 @@ export class ExamsService {
         'qp.questionId = q.id AND qp.studentId = :studentId',
         { studentId: studentId ?? '' },
       )
-      .where('q.examTypeSubjectId IN (:...etsIds)', { etsIds })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id IN (:...etsIds)', { etsIds })
       .andWhere('q.isActive = true')
       .andWhere('(qp.id IS NULL OR qp.timesAttempted = 0)')
       .orderBy('RANDOM()')
@@ -892,7 +901,8 @@ export class ExamsService {
         .createQueryBuilder('q')
         .leftJoinAndSelect('q.passage', 'passage')
         .leftJoinAndSelect('q.topic', 'topic')
-        .where('q.examTypeSubjectId IN (:...etsIds)', { etsIds })
+        .innerJoin('q.examTypeSubjects', 'qets')
+        .where('qets.id IN (:...etsIds)', { etsIds })
         .andWhere('q.isActive = true')
         .orderBy('RANDOM()')
         .limit(remaining);
@@ -918,7 +928,8 @@ export class ExamsService {
         'qp.questionId = q.id AND qp.studentId = :studentId',
         { studentId: studentId ?? '' },
       )
-      .where('q.examTypeSubjectId IN (:...etsIds)', { etsIds })
+      .innerJoin('q.examTypeSubjects', 'qets')
+      .where('qets.id IN (:...etsIds)', { etsIds })
       .andWhere('q.isActive = true')
       .andWhere('qp.timesAttempted > 0')
       .orderBy('qp.timesWrong', 'DESC')
@@ -1154,7 +1165,12 @@ export class ExamsService {
    * Scoped to all subjects that belong to the given examTypeId.
    * Used on the /student/topics page search.
    */
-  async searchTopics(examTypeId: string, q: string) {
+  async searchTopics(
+    examTypeId: string,
+    q: string,
+    page = 1,
+    limit = 20,
+  ): Promise<{ items: any[]; total: number; hasMore: boolean }> {
     const qb = this.topicRepo
       .createQueryBuilder('t')
       .innerJoin(
@@ -1171,7 +1187,14 @@ export class ExamsService {
       });
     }
 
-    return qb.orderBy('t.name', 'ASC').getMany();
+    const offset = (page - 1) * limit;
+    const [items, total] = await qb
+      .orderBy('t.name', 'ASC')
+      .skip(offset)
+      .take(limit)
+      .getManyAndCount();
+
+    return { items, total, hasMore: offset + items.length < total };
   }
 
   /**

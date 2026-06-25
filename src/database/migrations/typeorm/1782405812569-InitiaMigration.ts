@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class InitialMigration1781519385732 implements MigrationInterface {
-  name = 'InitialMigration1781519385732';
+export class InitiaMigration1782405812569 implements MigrationInterface {
+  name = 'InitiaMigration1782405812569';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -9,24 +9,6 @@ export class InitialMigration1781519385732 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE TABLE "countries" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "code" character varying NOT NULL, "codeLabel" character varying NOT NULL, "isoCode" character varying NOT NULL, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "UQ_fa1376321185575cf2226b1491d" UNIQUE ("name"), CONSTRAINT "UQ_dfcc02f3af5189a35e56e3363db" UNIQUE ("isoCode"), CONSTRAINT "PK_b2d7006793e8697ab3ae2deff18" PRIMARY KEY ("id"))`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."webhook_events_provider_enum" AS ENUM('stripe', 'paystack')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."webhook_events_eventtype_enum" AS ENUM('payment.succeeded', 'payment.failed', 'subscription.created', 'subscription.updated', 'subscription.renewed', 'subscription.cancelled', 'subscription.expired', 'invoice.created', 'invoice.payment_failed', 'refund.processed')`,
-    );
-    await queryRunner.query(
-      `CREATE TABLE "webhook_events" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "provider" "public"."webhook_events_provider_enum" NOT NULL, "providerEventId" character varying NOT NULL, "eventType" "public"."webhook_events_eventtype_enum" NOT NULL, "payload" jsonb NOT NULL, "processedAt" TIMESTAMP, "isProcessed" boolean NOT NULL DEFAULT false, "processingError" text, "retryCount" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_4cba37e6a0acb5e1fc49c34ebfd" PRIMARY KEY ("id"))`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_7b5b3ab6292671f4248bd2e0f7" ON "webhook_events" ("isProcessed") `,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_d33f799688d1bd44cf64b8f80f" ON "webhook_events" ("processedAt") `,
-    );
-    await queryRunner.query(
-      `CREATE UNIQUE INDEX "IDX_f9824a75e1373c0a43c0d8d17c" ON "webhook_events" ("provider", "providerEventId") `,
     );
     await queryRunner.query(
       `CREATE TABLE "refresh_tokens" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "token" text NOT NULL, "userId" uuid NOT NULL, "expiresAt" TIMESTAMP NOT NULL, "revoked" boolean NOT NULL DEFAULT false, "userAgent" character varying, "ipAddress" character varying, "familyId" character varying, CONSTRAINT "PK_7d8bee0204106019488c4c50ffa" PRIMARY KEY ("id"))`,
@@ -38,7 +20,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE INDEX "IDX_4542dd2f38a61354a040ba9fd5" ON "refresh_tokens" ("token") `,
     );
     await queryRunner.query(
-      `CREATE TABLE "subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "description" text, "totalQuestions" integer NOT NULL DEFAULT '0', "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_1a023685ac2b051b4e557b0b280" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "description" text, "totalQuestions" integer NOT NULL DEFAULT '0', "isActive" boolean NOT NULL DEFAULT true, "isAlsoPractical" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_1a023685ac2b051b4e557b0b280" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE TABLE "exam_type_subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeId" uuid NOT NULL, "subjectId" uuid NOT NULL, "isCompulsory" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_82a545b23c3551c887f10b6f0ce" PRIMARY KEY ("id"))`,
@@ -59,7 +41,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TABLE "sponsorships" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "sponsorId" uuid NOT NULL, "studentId" uuid NOT NULL, "subscriptionId" uuid NOT NULL, "status" "public"."sponsorships_status_enum" NOT NULL DEFAULT 'active', "startDate" TIMESTAMP NOT NULL, "endDate" TIMESTAMP NOT NULL, "amountPaid" double precision NOT NULL DEFAULT '0', "planId" character varying, CONSTRAINT "PK_393571b62d6dd0f63c6d3eb154b" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."donations_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+      `CREATE TYPE "public"."donations_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'GMD')`,
     );
     await queryRunner.query(
       `CREATE TYPE "public"."donations_type_enum" AS ENUM('exam_subscription', 'educational_items', 'general')`,
@@ -95,7 +77,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TYPE "public"."givebacks_type_enum" AS ENUM('subscription')`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."givebacks_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+      `CREATE TYPE "public"."givebacks_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'GMD')`,
     );
     await queryRunner.query(
       `CREATE TYPE "public"."givebacks_status_enum" AS ENUM('pending', 'active', 'expired', 'failed')`,
@@ -116,7 +98,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TABLE "sponsor_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "sponsorType" "public"."sponsor_profiles_sponsortype_enum" NOT NULL DEFAULT 'individual', "companyName" character varying, "totalStudentsSponsored" integer NOT NULL DEFAULT '0', "totalAmountDonated" double precision NOT NULL DEFAULT '0', CONSTRAINT "REL_4a88c1e9189bc4559f85363a21" UNIQUE ("userId"), CONSTRAINT "PK_9b2e91696550b43a5ca438a5713" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."plan_prices_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+      `CREATE TYPE "public"."plan_prices_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'GMD')`,
     );
     await queryRunner.query(
       `CREATE TABLE "plan_prices" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "planId" uuid NOT NULL, "currency" "public"."plan_prices_currency_enum" NOT NULL, "amount" double precision NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "stripePriceId" character varying, "paystackPlanCode" character varying, CONSTRAINT "PK_69b05dce9891d42a3d0fc77eec1" PRIMARY KEY ("id"))`,
@@ -140,7 +122,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TYPE "public"."transactions_type_enum" AS ENUM('subscription_purchase', 'subscription_renewal', 'sponsorship', 'refund')`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."transactions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+      `CREATE TYPE "public"."transactions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'GMD')`,
     );
     await queryRunner.query(
       `CREATE TYPE "public"."transactions_provider_enum" AS ENUM('stripe', 'paystack')`,
@@ -173,13 +155,13 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TYPE "public"."subscriptions_status_enum" AS ENUM('pending', 'scheduled', 'active', 'expired', 'cancelled', 'past_due', 'suspended')`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."subscriptions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+      `CREATE TYPE "public"."subscriptions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'GMD')`,
     );
     await queryRunner.query(
       `CREATE TYPE "public"."subscriptions_paymentprovider_enum" AS ENUM('stripe', 'paystack')`,
     );
     await queryRunner.query(
-      `CREATE TABLE "subscriptions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "planId" uuid NOT NULL, "planPriceId" uuid, "sponsorId" uuid, "studentExamTypeId" character varying, "startDate" TIMESTAMP, "endDate" TIMESTAMP, "status" "public"."subscriptions_status_enum" NOT NULL DEFAULT 'pending', "amountPaid" double precision NOT NULL DEFAULT '0', "currency" "public"."subscriptions_currency_enum" NOT NULL DEFAULT 'NGN', "paymentProvider" "public"."subscriptions_paymentprovider_enum" NOT NULL, "providerSubscriptionId" character varying, "providerCustomerId" character varying, "autoRenew" boolean NOT NULL DEFAULT false, "lastPaymentStatus" character varying, "cancelledAt" TIMESTAMP, "givebackId" character varying, CONSTRAINT "PK_a87248d73155605cf782be9ee5e" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "subscriptions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "planId" uuid NOT NULL, "planPriceId" uuid, "sponsorId" uuid, "studentExamTypeId" character varying, "startDate" TIMESTAMP, "endDate" TIMESTAMP, "status" "public"."subscriptions_status_enum" NOT NULL DEFAULT 'pending', "amountPaid" double precision NOT NULL DEFAULT '0', "currency" "public"."subscriptions_currency_enum" NOT NULL DEFAULT 'NGN', "paymentProvider" "public"."subscriptions_paymentprovider_enum" NOT NULL, "providerSubscriptionId" character varying, "providerCustomerId" character varying, "autoRenew" boolean NOT NULL DEFAULT false, "lastPaymentStatus" character varying, "cancelledAt" TIMESTAMP, "givebackId" character varying, "cardBrand" character varying, "cardLast4" character varying, "cardExpMonth" character varying, "cardExpYear" character varying, "cardBank" character varying, "cardChannel" character varying, CONSTRAINT "PK_a87248d73155605cf782be9ee5e" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_2eeb6283285e7ffc0afed6606a" ON "subscriptions" ("providerSubscriptionId") `,
@@ -194,7 +176,25 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE INDEX "IDX_d506aa039b006b68031e0961ad" ON "subscriptions" ("studentId", "examTypeId") `,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."region_currencies_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+      `CREATE TYPE "public"."webhook_events_provider_enum" AS ENUM('stripe', 'paystack')`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."webhook_events_eventtype_enum" AS ENUM('payment.succeeded', 'payment.failed', 'subscription.created', 'subscription.updated', 'subscription.renewed', 'subscription.cancelled', 'subscription.expired', 'invoice.created', 'invoice.payment_failed', 'refund.processed')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "webhook_events" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "provider" "public"."webhook_events_provider_enum" NOT NULL, "providerEventId" character varying NOT NULL, "eventType" "public"."webhook_events_eventtype_enum" NOT NULL, "payload" jsonb NOT NULL, "processedAt" TIMESTAMP, "isProcessed" boolean NOT NULL DEFAULT false, "processingError" text, "retryCount" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_4cba37e6a0acb5e1fc49c34ebfd" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_7b5b3ab6292671f4248bd2e0f7" ON "webhook_events" ("isProcessed") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_d33f799688d1bd44cf64b8f80f" ON "webhook_events" ("processedAt") `,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_f9824a75e1373c0a43c0d8d17c" ON "webhook_events" ("provider", "providerEventId") `,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."region_currencies_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'GMD')`,
     );
     await queryRunner.query(
       `CREATE TYPE "public"."region_currencies_paymentprovider_enum" AS ENUM('stripe', 'paystack')`,
@@ -218,7 +218,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TYPE "public"."exam_attempts_status_enum" AS ENUM('in_progress', 'completed', 'auto_submitted')`,
     );
     await queryRunner.query(
-      `CREATE TABLE "exam_attempts" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "mode" "public"."exam_attempts_mode_enum" NOT NULL, "selectedSubjects" json NOT NULL, "totalQuestions" integer NOT NULL, "correctAnswers" integer NOT NULL DEFAULT '0', "wrongAnswers" integer NOT NULL DEFAULT '0', "unanswered" integer NOT NULL DEFAULT '0', "scorePercentage" double precision NOT NULL DEFAULT '0', "totalMarksObtained" double precision NOT NULL DEFAULT '0', "totalMarksPossible" double precision NOT NULL DEFAULT '0', "questionResponses" json NOT NULL, "timeSpentSeconds" integer NOT NULL DEFAULT '0', "timeLimitSeconds" integer, "status" "public"."exam_attempts_status_enum" NOT NULL DEFAULT 'in_progress', "startedAt" TIMESTAMP NOT NULL, "completedAt" TIMESTAMP, "questionIds" json, "draftResponses" json, CONSTRAINT "PK_4eb6c7775e0a9c178ef7f4826f9" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "exam_attempts" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "examTypeId" uuid NOT NULL, "mode" "public"."exam_attempts_mode_enum" NOT NULL, "selectedSubjects" json NOT NULL, "totalQuestions" integer NOT NULL, "correctAnswers" integer NOT NULL DEFAULT '0', "wrongAnswers" integer NOT NULL DEFAULT '0', "unanswered" integer NOT NULL DEFAULT '0', "scorePercentage" double precision NOT NULL DEFAULT '0', "totalMarksObtained" double precision NOT NULL DEFAULT '0', "totalMarksPossible" double precision NOT NULL DEFAULT '0', "questionResponses" json NOT NULL, "timeSpentSeconds" integer NOT NULL DEFAULT '0', "timeLimitSeconds" integer, "status" "public"."exam_attempts_status_enum" NOT NULL DEFAULT 'in_progress', "startedAt" TIMESTAMP NOT NULL, "completedAt" TIMESTAMP, "category" character varying, "questionIds" json, "draftResponses" json, CONSTRAINT "PK_4eb6c7775e0a9c178ef7f4826f9" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE TABLE "student_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "defaultExamTypeId" uuid, "lastExamTypeId" character varying, "totalQuestionsSolved" integer NOT NULL DEFAULT '0', "totalCorrect" integer NOT NULL DEFAULT '0', "totalWrong" integer NOT NULL DEFAULT '0', "overallAccuracy" double precision NOT NULL DEFAULT '0', "hasEverSubscribed" boolean NOT NULL DEFAULT false, "isSponsored" boolean NOT NULL DEFAULT false, "sponsorId" character varying, "sponsorUrlId" character varying, "sponsorDisplayName" character varying, CONSTRAINT "REL_064d129936a1e821d637ee8c88" UNIQUE ("userId"), CONSTRAINT "PK_5ed0a32eeaddfe812fb326177d0" PRIMARY KEY ("id"))`,
@@ -236,7 +236,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TYPE "public"."commissions_status_enum" AS ENUM('pending', 'paid')`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."commissions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD')`,
+      `CREATE TYPE "public"."commissions_currency_enum" AS ENUM('NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'GMD')`,
     );
     await queryRunner.query(
       `CREATE TABLE "commissions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "affiliateId" uuid NOT NULL, "referralId" uuid NOT NULL, "amount" double precision NOT NULL, "status" "public"."commissions_status_enum" NOT NULL DEFAULT 'pending', "paidAt" TIMESTAMP, "subscriptionId" uuid, "subscriptionAmount" double precision, "currency" "public"."commissions_currency_enum", "planName" character varying, CONSTRAINT "PK_2701379966e2e670bb5ff0ae78e" PRIMARY KEY ("id"))`,
@@ -251,7 +251,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TYPE "public"."users_provider_enum" AS ENUM('local', 'google', 'dual')`,
     );
     await queryRunner.query(
-      `CREATE TABLE "users" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "email" character varying NOT NULL, "password" character varying, "firstName" character varying NOT NULL, "lastName" character varying, "phoneNumber" character varying, "countryCode" character varying, "picture" character varying, "role" "public"."users_role_enum", "provider" "public"."users_provider_enum" NOT NULL DEFAULT 'local', "googleId" character varying, "emailVerified" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "suspendedUntil" TIMESTAMP WITH TIME ZONE, "newsletterOptIn" boolean NOT NULL DEFAULT true, "promotionsOptIn" boolean NOT NULL DEFAULT true, "lastLogin" TIMESTAMP, CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "users" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "email" character varying NOT NULL, "password" character varying, "firstName" character varying NOT NULL, "lastName" character varying, "phoneNumber" character varying, "countryCode" character varying, "picture" character varying, "role" "public"."users_role_enum", "provider" "public"."users_provider_enum" NOT NULL DEFAULT 'local', "googleId" character varying, "googleEmail" character varying, "emailVerified" boolean NOT NULL DEFAULT false, "isActive" boolean NOT NULL DEFAULT true, "suspendedUntil" TIMESTAMP WITH TIME ZONE, "newsletterOptIn" boolean NOT NULL DEFAULT true, "promotionsOptIn" boolean NOT NULL DEFAULT true, "productUpdatesOptIn" boolean NOT NULL DEFAULT true, "securityAlertsOptIn" boolean NOT NULL DEFAULT true, "lastLogin" TIMESTAMP, CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE TABLE "student_exam_type_subjects" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentExamTypeId" uuid NOT NULL, "subjectId" uuid NOT NULL, CONSTRAINT "PK_f93e880d7cd08828cd179cddd5e" PRIMARY KEY ("id"))`,
@@ -260,7 +260,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE UNIQUE INDEX "IDX_c9529597f1e0426f11b01c2aed" ON "student_exam_type_subjects" ("studentExamTypeId", "subjectId") `,
     );
     await queryRunner.query(
-      `CREATE TABLE "passages" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeSubjectId" uuid NOT NULL, "title" text NOT NULL, "content" text NOT NULL, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_5f625d72252d22b1826b4ac79cf" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "passages" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "title" text NOT NULL, "content" text NOT NULL, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_5f625d72252d22b1826b4ac79cf" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE TABLE "topics" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "subjectId" uuid NOT NULL, "name" character varying NOT NULL, "content" text, "isActive" boolean NOT NULL DEFAULT true, CONSTRAINT "PK_e4aa99a3fa60ec3a37d1fc4e853" PRIMARY KEY ("id"))`,
@@ -281,7 +281,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TYPE "public"."questions_difficulty_enum" AS ENUM('easy', 'medium', 'hard')`,
     );
     await queryRunner.query(
-      `CREATE TABLE "questions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "examTypeSubjectId" uuid NOT NULL, "passageId" uuid, "questionText" text NOT NULL, "options" json, "type" "public"."questions_type_enum" NOT NULL, "correctAnswer" json, "topicId" uuid, "explanation" text, "validationConfig" json, "category" "public"."questions_category_enum" NOT NULL DEFAULT 'objectives', "difficulty" "public"."questions_difficulty_enum" NOT NULL DEFAULT 'medium', "marks" double precision NOT NULL DEFAULT '1', "isActive" boolean NOT NULL DEFAULT true, "timesAttempted" integer NOT NULL DEFAULT '0', "timesCorrect" integer NOT NULL DEFAULT '0', "legacyId" character varying, CONSTRAINT "UQ_afbe58b8f43ba71147c5f7bb1a7" UNIQUE ("legacyId"), CONSTRAINT "PK_08a6d4b0f49ff300bf3a0ca60ac" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "questions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "passageId" uuid, "questionText" text NOT NULL, "options" json, "type" "public"."questions_type_enum" NOT NULL, "correctAnswer" json, "topicId" uuid, "explanation" text, "validationConfig" json, "category" "public"."questions_category_enum" NOT NULL DEFAULT 'objectives', "difficulty" "public"."questions_difficulty_enum" NOT NULL DEFAULT 'medium', "marks" double precision NOT NULL DEFAULT '1', "isActive" boolean NOT NULL DEFAULT true, "timesAttempted" integer NOT NULL DEFAULT '0', "timesCorrect" integer NOT NULL DEFAULT '0', "legacyId" character varying, CONSTRAINT "UQ_afbe58b8f43ba71147c5f7bb1a7" UNIQUE ("legacyId"), CONSTRAINT "PK_08a6d4b0f49ff300bf3a0ca60ac" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE TABLE "question_progress" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "questionId" uuid NOT NULL, "isDone" boolean NOT NULL DEFAULT false, "timesAttempted" integer NOT NULL DEFAULT '0', "timesCorrect" integer NOT NULL DEFAULT '0', "timesWrong" integer NOT NULL DEFAULT '0', "lastAttempted" TIMESTAMP, CONSTRAINT "PK_4b2729de0fb92f5960ac1ca4762" PRIMARY KEY ("id"))`,
@@ -296,12 +296,6 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TABLE "flagged_questions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "studentId" uuid NOT NULL, "questionId" uuid NOT NULL, "reason" text, "flagType" "public"."flagged_questions_flagtype_enum" NOT NULL DEFAULT 'error', "adminReviewed" boolean NOT NULL DEFAULT false, "flaggedAt" TIMESTAMP NOT NULL, CONSTRAINT "PK_e1aaae07978d0aecda4fa07a782" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TABLE "push_subscriptions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "endpoint" character varying NOT NULL, "p256dh" character varying NOT NULL, "auth" character varying NOT NULL, "userAgent" character varying, CONSTRAINT "UQ_0008bdfd174e533a3f98bf9af16" UNIQUE ("endpoint"), CONSTRAINT "PK_757fc8f00c34f66832668dc2e53" PRIMARY KEY ("id"))`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_4cc061875e9eecc311a94b3e43" ON "push_subscriptions" ("userId") `,
-    );
-    await queryRunner.query(
       `CREATE TYPE "public"."notifications_type_enum" AS ENUM('new_message', 'new_chatroom', 'giveback_activated', 'subscription_expiring', 'subscription_expired', 'exam_result', 'flagged_message_reviewed')`,
     );
     await queryRunner.query(
@@ -309,6 +303,12 @@ export class InitialMigration1781519385732 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_ba953fe98c085411bba8535299" ON "notifications" ("recipientId", "isRead", "createdAt") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "push_subscriptions" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "endpoint" character varying NOT NULL, "p256dh" character varying NOT NULL, "auth" character varying NOT NULL, "userAgent" character varying, CONSTRAINT "UQ_0008bdfd174e533a3f98bf9af16" UNIQUE ("endpoint"), CONSTRAINT "PK_757fc8f00c34f66832668dc2e53" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4cc061875e9eecc311a94b3e43" ON "push_subscriptions" ("userId") `,
     );
     await queryRunner.query(
       `CREATE TYPE "public"."activity_logs_action_enum" AS ENUM('login', 'signup', 'exam_start', 'exam_submit', 'payment', 'error', 'system', 'other', 'create', 'read', 'update', 'delete')`,
@@ -368,7 +368,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TABLE "onboarding_tokens" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "token" character varying NOT NULL, "isUsed" boolean NOT NULL DEFAULT false, "usedAt" TIMESTAMP, CONSTRAINT "UQ_8f8b5f36d2ffe14ec26d68824e8" UNIQUE ("token"), CONSTRAINT "PK_0d4f9cc4392b0553096d84f461a" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TABLE "email_verification_codes" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "code" text NOT NULL, "userId" uuid NOT NULL, "expiresAt" TIMESTAMP NOT NULL, "used" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_5bb1cbeebcbcb38996911bff8d4" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "email_verification_codes" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "code" text NOT NULL, "userId" uuid NOT NULL, "purpose" character varying NOT NULL DEFAULT 'email_verification', "expiresAt" TIMESTAMP NOT NULL, "used" boolean NOT NULL DEFAULT false, "sentCount" integer NOT NULL DEFAULT '1', "lastSentAt" TIMESTAMP, CONSTRAINT "PK_5bb1cbeebcbcb38996911bff8d4" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_97bef998b0d463cb053643822a" ON "email_verification_codes" ("userId") `,
@@ -431,13 +431,13 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `CREATE TABLE "admin_profiles" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" uuid NOT NULL, "isSuper" boolean NOT NULL DEFAULT false, "roleId" uuid, "modulePermissions" jsonb NOT NULL DEFAULT '{}', "isActive" boolean NOT NULL DEFAULT true, "createdById" uuid, CONSTRAINT "REL_d1b5f61ecc9c83a766503b9eb7" UNIQUE ("userId"), CONSTRAINT "PK_89c52edc2b9c2178f1acd127f3a" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."bulk_email_campaigns_targetaudience_enum" AS ENUM('all', 'students', 'sponsors', 'affiliates')`,
+      `CREATE TYPE "public"."bulk_email_campaigns_category_enum" AS ENUM('newsletter', 'promotions', 'product_updates', 'security_alerts')`,
     );
     await queryRunner.query(
       `CREATE TYPE "public"."bulk_email_campaigns_status_enum" AS ENUM('draft', 'queued', 'sent', 'failed')`,
     );
     await queryRunner.query(
-      `CREATE TABLE "bulk_email_campaigns" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "subject" character varying NOT NULL, "content" text NOT NULL, "targetAudience" "public"."bulk_email_campaigns_targetaudience_enum" NOT NULL DEFAULT 'all', "status" "public"."bulk_email_campaigns_status_enum" NOT NULL DEFAULT 'draft', "recipientCount" integer NOT NULL DEFAULT '0', "sentAt" TIMESTAMP WITH TIME ZONE, "createdById" uuid NOT NULL, CONSTRAINT "PK_a1c8cf15760e6efb53b888241fa" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "bulk_email_campaigns" ("id" uuid NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "name" character varying NOT NULL, "subject" character varying NOT NULL, "content" text NOT NULL, "category" "public"."bulk_email_campaigns_category_enum" NOT NULL DEFAULT 'newsletter', "targetAudiences" text NOT NULL DEFAULT 'all', "status" "public"."bulk_email_campaigns_status_enum" NOT NULL DEFAULT 'draft', "recipientCount" integer NOT NULL DEFAULT '0', "sentAt" TIMESTAMP WITH TIME ZONE, "createdById" uuid NOT NULL, CONSTRAINT "PK_a1c8cf15760e6efb53b888241fa" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_567f5d462e1a6545966c2b9c63" ON "bulk_email_campaigns" ("status") `,
@@ -453,6 +453,24 @@ export class InitialMigration1781519385732 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE UNIQUE INDEX "IDX_cb28d21e06985a87a079fb73bc" ON "admin_invites" ("token") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "passage_exam_type_subjects" ("passageId" uuid NOT NULL, "examTypeSubjectId" uuid NOT NULL, CONSTRAINT "PK_34286a76957196f4ba8beba0665" PRIMARY KEY ("passageId", "examTypeSubjectId"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_8765e73b471c57d482a286fa86" ON "passage_exam_type_subjects" ("passageId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_bbc49b227545d02d3ab0fb848f" ON "passage_exam_type_subjects" ("examTypeSubjectId") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "question_exam_type_subjects" ("questionId" uuid NOT NULL, "examTypeSubjectId" uuid NOT NULL, CONSTRAINT "PK_e615dce81f9f66511bd66ffb317" PRIMARY KEY ("questionId", "examTypeSubjectId"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_c3c0c9cdfd1414b71ab5cb717c" ON "question_exam_type_subjects" ("questionId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_f6cce5b17b89aef78ce8907014" ON "question_exam_type_subjects" ("examTypeSubjectId") `,
     );
     await queryRunner.query(
       `ALTER TABLE "refresh_tokens" ADD CONSTRAINT "FK_610102b60fea1455310ccd299de" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
@@ -569,16 +587,10 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `ALTER TABLE "student_exam_type_subjects" ADD CONSTRAINT "FK_d61ed4721979e642e9cdd7d5deb" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
-      `ALTER TABLE "passages" ADD CONSTRAINT "FK_9fbfea3e16e05a89274192a57a6" FOREIGN KEY ("examTypeSubjectId") REFERENCES "exam_type_subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
-    );
-    await queryRunner.query(
       `ALTER TABLE "topics" ADD CONSTRAINT "FK_38b54068d2482668ba8f81a59ae" FOREIGN KEY ("subjectId") REFERENCES "subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
       `ALTER TABLE "questions" ADD CONSTRAINT "FK_e5d76861587b8a6472ec7a26c74" FOREIGN KEY ("topicId") REFERENCES "topics"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "questions" ADD CONSTRAINT "FK_e2d2fc7472851dfe305c631c047" FOREIGN KEY ("examTypeSubjectId") REFERENCES "exam_type_subjects"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
       `ALTER TABLE "questions" ADD CONSTRAINT "FK_9639bdb4fa738fcb27904b8ddac" FOREIGN KEY ("passageId") REFERENCES "passages"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
@@ -682,9 +694,33 @@ export class InitialMigration1781519385732 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "admin_invites" ADD CONSTRAINT "FK_ddf9b1ee11d5ec3d90fe9e065a2" FOREIGN KEY ("createdById") REFERENCES "admin_profiles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
+    await queryRunner.query(
+      `ALTER TABLE "passage_exam_type_subjects" ADD CONSTRAINT "FK_8765e73b471c57d482a286fa860" FOREIGN KEY ("passageId") REFERENCES "passages"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "passage_exam_type_subjects" ADD CONSTRAINT "FK_bbc49b227545d02d3ab0fb848f8" FOREIGN KEY ("examTypeSubjectId") REFERENCES "exam_type_subjects"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "question_exam_type_subjects" ADD CONSTRAINT "FK_c3c0c9cdfd1414b71ab5cb717c4" FOREIGN KEY ("questionId") REFERENCES "questions"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "question_exam_type_subjects" ADD CONSTRAINT "FK_f6cce5b17b89aef78ce8907014d" FOREIGN KEY ("examTypeSubjectId") REFERENCES "exam_type_subjects"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "question_exam_type_subjects" DROP CONSTRAINT "FK_f6cce5b17b89aef78ce8907014d"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "question_exam_type_subjects" DROP CONSTRAINT "FK_c3c0c9cdfd1414b71ab5cb717c4"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "passage_exam_type_subjects" DROP CONSTRAINT "FK_bbc49b227545d02d3ab0fb848f8"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "passage_exam_type_subjects" DROP CONSTRAINT "FK_8765e73b471c57d482a286fa860"`,
+    );
     await queryRunner.query(
       `ALTER TABLE "admin_invites" DROP CONSTRAINT "FK_ddf9b1ee11d5ec3d90fe9e065a2"`,
     );
@@ -788,16 +824,10 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `ALTER TABLE "questions" DROP CONSTRAINT "FK_9639bdb4fa738fcb27904b8ddac"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "questions" DROP CONSTRAINT "FK_e2d2fc7472851dfe305c631c047"`,
-    );
-    await queryRunner.query(
       `ALTER TABLE "questions" DROP CONSTRAINT "FK_e5d76861587b8a6472ec7a26c74"`,
     );
     await queryRunner.query(
       `ALTER TABLE "topics" DROP CONSTRAINT "FK_38b54068d2482668ba8f81a59ae"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "passages" DROP CONSTRAINT "FK_9fbfea3e16e05a89274192a57a6"`,
     );
     await queryRunner.query(
       `ALTER TABLE "student_exam_type_subjects" DROP CONSTRAINT "FK_d61ed4721979e642e9cdd7d5deb"`,
@@ -914,6 +944,20 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `ALTER TABLE "refresh_tokens" DROP CONSTRAINT "FK_610102b60fea1455310ccd299de"`,
     );
     await queryRunner.query(
+      `DROP INDEX "public"."IDX_f6cce5b17b89aef78ce8907014"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_c3c0c9cdfd1414b71ab5cb717c"`,
+    );
+    await queryRunner.query(`DROP TABLE "question_exam_type_subjects"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_bbc49b227545d02d3ab0fb848f"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_8765e73b471c57d482a286fa86"`,
+    );
+    await queryRunner.query(`DROP TABLE "passage_exam_type_subjects"`);
+    await queryRunner.query(
       `DROP INDEX "public"."IDX_cb28d21e06985a87a079fb73bc"`,
     );
     await queryRunner.query(
@@ -929,7 +973,7 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `DROP TYPE "public"."bulk_email_campaigns_status_enum"`,
     );
     await queryRunner.query(
-      `DROP TYPE "public"."bulk_email_campaigns_targetaudience_enum"`,
+      `DROP TYPE "public"."bulk_email_campaigns_category_enum"`,
     );
     await queryRunner.query(`DROP TABLE "admin_profiles"`);
     await queryRunner.query(
@@ -1008,14 +1052,14 @@ export class InitialMigration1781519385732 implements MigrationInterface {
     await queryRunner.query(`DROP TYPE "public"."activity_logs_severity_enum"`);
     await queryRunner.query(`DROP TYPE "public"."activity_logs_action_enum"`);
     await queryRunner.query(
+      `DROP INDEX "public"."IDX_4cc061875e9eecc311a94b3e43"`,
+    );
+    await queryRunner.query(`DROP TABLE "push_subscriptions"`);
+    await queryRunner.query(
       `DROP INDEX "public"."IDX_ba953fe98c085411bba8535299"`,
     );
     await queryRunner.query(`DROP TABLE "notifications"`);
     await queryRunner.query(`DROP TYPE "public"."notifications_type_enum"`);
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_4cc061875e9eecc311a94b3e43"`,
-    );
-    await queryRunner.query(`DROP TABLE "push_subscriptions"`);
     await queryRunner.query(`DROP TABLE "flagged_questions"`);
     await queryRunner.query(
       `DROP TYPE "public"."flagged_questions_flagtype_enum"`,
@@ -1071,6 +1115,22 @@ export class InitialMigration1781519385732 implements MigrationInterface {
     );
     await queryRunner.query(
       `DROP TYPE "public"."region_currencies_currency_enum"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_f9824a75e1373c0a43c0d8d17c"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_d33f799688d1bd44cf64b8f80f"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_7b5b3ab6292671f4248bd2e0f7"`,
+    );
+    await queryRunner.query(`DROP TABLE "webhook_events"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."webhook_events_eventtype_enum"`,
+    );
+    await queryRunner.query(
+      `DROP TYPE "public"."webhook_events_provider_enum"`,
     );
     await queryRunner.query(
       `DROP INDEX "public"."IDX_d506aa039b006b68031e0961ad"`,
@@ -1179,22 +1239,6 @@ export class InitialMigration1781519385732 implements MigrationInterface {
       `DROP INDEX "public"."IDX_610102b60fea1455310ccd299d"`,
     );
     await queryRunner.query(`DROP TABLE "refresh_tokens"`);
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_f9824a75e1373c0a43c0d8d17c"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_d33f799688d1bd44cf64b8f80f"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_7b5b3ab6292671f4248bd2e0f7"`,
-    );
-    await queryRunner.query(`DROP TABLE "webhook_events"`);
-    await queryRunner.query(
-      `DROP TYPE "public"."webhook_events_eventtype_enum"`,
-    );
-    await queryRunner.query(
-      `DROP TYPE "public"."webhook_events_provider_enum"`,
-    );
     await queryRunner.query(`DROP TABLE "countries"`);
     await queryRunner.query(`DROP TABLE "migration_history"`);
   }

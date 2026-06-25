@@ -43,6 +43,10 @@ export class User extends BaseEntity {
   @Column({ nullable: true })
   googleId: string;
 
+  // Email of the connected Google account (may differ from primary email for DUAL users)
+  @Column({ nullable: true, type: 'varchar' })
+  googleEmail: string;
+
   @Column({ default: false })
   emailVerified: boolean;
 
@@ -57,6 +61,12 @@ export class User extends BaseEntity {
 
   @Column({ default: true })
   promotionsOptIn: boolean;
+
+  @Column({ default: true })
+  productUpdatesOptIn: boolean;
+
+  @Column({ default: true })
+  securityAlertsOptIn: boolean;
 
   @Column({ type: 'timestamp', nullable: true })
   lastLogin: Date;

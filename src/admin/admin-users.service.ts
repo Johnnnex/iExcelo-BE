@@ -216,7 +216,12 @@ export class AdminUsersService {
 
   // ─── Affiliates ────────────────────────────────────────────────────────────
 
-  async listAffiliates(limit: number, search?: string, cursor?: string, userType?: string) {
+  async listAffiliates(
+    limit: number,
+    search?: string,
+    cursor?: string,
+    userType?: string,
+  ) {
     const qb = this.affiliateProfileRepo
       .createQueryBuilder('ap')
       .leftJoinAndSelect('ap.user', 'u')
@@ -325,11 +330,7 @@ export class AdminUsersService {
     return { message: 'Payout rejected' };
   }
 
-  async listAllPayouts(
-    page: number,
-    limit: number,
-    status?: string,
-  ) {
+  async listAllPayouts(page: number, limit: number, status?: string) {
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
 

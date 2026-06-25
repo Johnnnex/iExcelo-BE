@@ -33,8 +33,8 @@ export class AdminInvite extends BaseEntity {
   })
   status: AdminInviteStatus;
 
-  @Column({ nullable: true })
-  roleId: string | null;
+  @Column({ nullable: true, type: 'varchar' })
+  roleId: string;
 
   @Column({ type: 'jsonb', default: {} })
   modulePermissions: ModulePermissionsMap;

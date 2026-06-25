@@ -3,6 +3,7 @@ export const EMAILS_QUEUE = 'emails';
 export const EmailJobs = {
   SEND_VERIFICATION: 'send_verification_email',
   SEND_PASSWORD_RESET: 'send_password_reset_email',
+  SEND_SET_PASSWORD: 'send_set_password_email',
   SEND_ONBOARDING: 'send_onboarding_email',
   SEND_WELCOME: 'send_welcome_email',
   SEND_SPONSORED_ACTIVATION: 'send_sponsored_activation_email',
@@ -40,9 +41,16 @@ export interface SendSponsoredActivationEmailJobData {
   sponsorName: string;
 }
 
+export interface SendSetPasswordEmailJobData {
+  email: string;
+  firstName: string;
+  code: string;
+}
+
 export interface SendBulkCampaignEmailJobData {
   email: string;
   firstName: string;
   subject: string;
   htmlContent: string;
+  category?: string;
 }

@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
+import Stripe from 'stripe';
 import {
   ANALYTICS_QUEUE,
   AnalyticsJobs,
@@ -41,6 +42,7 @@ import {
 @Injectable()
 export class SubscriptionsService {
   private readonly logger = new Logger(SubscriptionsService.name);
+  private stripe: Stripe | null = null;
 
   constructor(
     @InjectRepository(Subscription)
@@ -60,7 +62,10 @@ export class SubscriptionsService {
     private affiliatesService: AffiliatesService,
     @Inject(forwardRef(() => StudentsService))
     private readonly studentsService: StudentsService,
-  ) {}
+  ) {
+    const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    if (stripeKey) this.stripe = new Stripe(stripeKey);
+  }
 
   /**
    * Creates subscription plans and prices for all active exam types.
@@ -156,7 +161,7 @@ export class SubscriptionsService {
       planId: data.planId,
       planPriceId: data.planPriceId,
       sponsorId: data.sponsorId,
-      givebackId: data.givebackId ?? null,
+      givebackId: data.givebackId,
       status: SubscriptionStatus.PENDING,
       paymentProvider: data.provider,
       currency: data.currency,
@@ -483,6 +488,31 @@ export class SubscriptionsService {
         },
       ],
       relations: ['plan', 'planPrice'],
+      order: { endDate: 'DESC' },
+    });
+  }
+
+  /**
+   * All current (ACTIVE or CANCELLED-with-future-endDate) subscriptions for a student,
+   * across every exam type. Used by the billing page overview.
+   */
+  async findAllCurrentSubscriptions(
+    studentId: string,
+  ): Promise<Subscription[]> {
+    return this.subscriptionRepo.find({
+      where: [
+        {
+          studentId,
+          status: SubscriptionStatus.ACTIVE,
+          endDate: MoreThan(new Date()),
+        },
+        {
+          studentId,
+          status: SubscriptionStatus.CANCELLED,
+          endDate: MoreThan(new Date()),
+        },
+      ],
+      relations: ['plan', 'examType'],
       order: { endDate: 'DESC' },
     });
   }
@@ -968,6 +998,24 @@ export class SubscriptionsService {
   }
 
   /**
+   * Save card info and optional manage link on a subscription.
+   * Called from webhooks after a successful payment.
+   */
+  async updateCardInfo(
+    subscriptionId: string,
+    data: {
+      cardBrand?: string;
+      cardLast4?: string;
+      cardExpMonth?: string;
+      cardExpYear?: string;
+      cardBank?: string;
+      cardChannel?: string;
+    },
+  ): Promise<void> {
+    await this.subscriptionRepo.update(subscriptionId, data);
+  }
+
+  /**
    * Find a recent subscription by provider customer ID and plan code.
    * Used by subscription.create webhook to match Paystack subscription_code
    * to our internal subscription after the initial charge.success has fired.
@@ -1433,6 +1481,74 @@ export class SubscriptionsService {
   }
 
   /**
+   * Unified card info fetch — dispatches to the correct provider based on the
+   * subscription's paymentProvider field.
+   */
+  async fetchCardInfo(subscription: Subscription): Promise<{
+    brand: string;
+    last4: string;
+    expMonth: string;
+    expYear: string;
+    bank: string | null;
+    channel: string | null;
+    next_payment_date: string | null;
+    provider: PaymentProvider;
+  } | null> {
+    if (!subscription.providerSubscriptionId) return null;
+
+    if (subscription.paymentProvider === PaymentProvider.PAYSTACK) {
+      const info = await this.fetchPaystackSubscription(
+        subscription.providerSubscriptionId,
+      );
+      return info ? { ...info, provider: PaymentProvider.PAYSTACK } : null;
+    }
+
+    if (subscription.paymentProvider === PaymentProvider.STRIPE) {
+      return this.fetchStripeCardInfo(subscription.providerSubscriptionId);
+    }
+
+    return null;
+  }
+
+  private async fetchStripeCardInfo(subscriptionId: string): Promise<{
+    brand: string;
+    last4: string;
+    expMonth: string;
+    expYear: string;
+    bank: string | null;
+    channel: string | null;
+    next_payment_date: string | null;
+    provider: PaymentProvider;
+  } | null> {
+    if (!this.stripe) return null;
+    try {
+      const sub = (await this.stripe.subscriptions.retrieve(subscriptionId, {
+        expand: ['default_payment_method'],
+      })) as unknown as Stripe.Subscription & { current_period_end: number };
+
+      const pm = sub.default_payment_method as Stripe.PaymentMethod | null;
+      if (!pm?.card) return null;
+
+      const nextDate = sub.current_period_end
+        ? new Date(sub.current_period_end * 1000).toISOString()
+        : null;
+
+      return {
+        brand: pm.card.brand,
+        last4: pm.card.last4,
+        expMonth: String(pm.card.exp_month).padStart(2, '0'),
+        expYear: String(pm.card.exp_year),
+        bank: null,
+        channel: 'card',
+        next_payment_date: nextDate,
+        provider: PaymentProvider.STRIPE,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get Paystack subscription manage link (for card updates)
    */
   async getPaystackManageLink(
@@ -1711,5 +1827,49 @@ export class SubscriptionsService {
       this.logger.error(`Paystack create subscription error: ${error}`);
       return null;
     }
+  }
+
+  async getBillingHistory(
+    studentId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<{
+    items: Record<string, unknown>[];
+    total: number;
+    page: number;
+  }> {
+    const [rows, total] = await this.transactionRepo.findAndCount({
+      where: { studentId },
+      relations: { subscription: true },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const items = rows.map((t) => {
+      const sub = t.subscription;
+      const isSponsored = !!sub?.givebackId;
+      return {
+        id: t.id,
+        type: t.type,
+        amount: t.amount,
+        currency: t.currency,
+        provider: t.provider,
+        status: t.status,
+        paidAt: t.paidAt,
+        createdAt: t.createdAt,
+        subscriptionId: t.subscriptionId,
+        // Card info from the linked subscription — null if sponsored
+        isSponsored,
+        cardBrand: isSponsored ? null : (sub?.cardBrand ?? null),
+        cardLast4: isSponsored ? null : (sub?.cardLast4 ?? null),
+        cardExpMonth: isSponsored ? null : (sub?.cardExpMonth ?? null),
+        cardExpYear: isSponsored ? null : (sub?.cardExpYear ?? null),
+        cardBank: isSponsored ? null : (sub?.cardBank ?? null),
+        cardChannel: isSponsored ? null : (sub?.cardChannel ?? null),
+      };
+    });
+
+    return { items, total, page };
   }
 }

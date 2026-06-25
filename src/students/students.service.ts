@@ -227,6 +227,49 @@ export class StudentsService {
         })
       : [];
 
+    // Per-ETS question counts: first resolve exact ETS IDs, then count questions by those IDs.
+    // This mirrors the Admin's approach of filtering questions by examTypeSubjectId directly.
+    const subjectIdsForCount = selectedSubjects.map((s) => s.subject.id);
+    const etsRecords: Array<{ id: string; subjectId: string }> =
+      subjectIdsForCount.length > 0 && resolvedExamTypeId
+        ? await this.studentProfileRepo.manager.query(
+            `SELECT id, "subjectId"
+             FROM exam_type_subjects
+             WHERE "examTypeId" = $1 AND "subjectId" = ANY($2)`,
+            [resolvedExamTypeId, subjectIdsForCount],
+          )
+        : [];
+    const etsIds = etsRecords.map((e) => e.id);
+    const etsCounts: Array<{
+      etsId: string;
+      total: number;
+      practicalCount: number;
+    }> =
+      etsIds.length > 0
+        ? await this.studentProfileRepo.manager.query(
+            `SELECT qets."examTypeSubjectId" AS "etsId",
+                    COUNT(DISTINCT q.id)::int AS total,
+                    SUM(CASE WHEN q.category = 'practical' THEN 1 ELSE 0 END)::int AS "practicalCount"
+             FROM questions q
+             INNER JOIN question_exam_type_subjects qets ON qets."questionId" = q.id
+             WHERE qets."examTypeSubjectId" = ANY($1)
+             GROUP BY qets."examTypeSubjectId"`,
+            [etsIds],
+          )
+        : [];
+    const etsCountMap = new Map(
+      etsCounts.map((r) => [
+        r.etsId,
+        { total: Number(r.total), practicalCount: Number(r.practicalCount) },
+      ]),
+    );
+    const questionCountMap = new Map(
+      etsRecords.map((e) => [
+        e.subjectId,
+        etsCountMap.get(e.id) ?? { total: 0, practicalCount: 0 },
+      ]),
+    );
+
     // Stats — all scoped to the current exam type
     const examTypeStatsRaw = await this.examAttemptRepo
       .createQueryBuilder('ea')
@@ -258,9 +301,14 @@ export class StudentsService {
             .addSelect('COUNT(DISTINCT qp."questionId")', 'count')
             .innerJoin('questions', 'q', 'q.id = qp."questionId"')
             .innerJoin(
+              'question_exam_type_subjects',
+              'qets',
+              'qets."questionId" = q.id',
+            )
+            .innerJoin(
               'exam_type_subjects',
               'ets',
-              'ets.id = q."examTypeSubjectId"',
+              'ets.id = qets."examTypeSubjectId"',
             )
             .where('qp."studentId" = :studentId', { studentId: student.id })
             .andWhere('ets."examTypeId" = :examTypeId', {
@@ -273,11 +321,20 @@ export class StudentsService {
       subjectProgressRows.map((r) => [r.subjectId, parseInt(r.count, 10)]),
     );
 
-    // Count unique questions practiced via question_progress (joins through questions → exam_type_subjects)
+    // Count unique questions practiced via question_progress (joins through question_exam_type_subjects)
     const totalQuestionsSolved = await this.questionProgressRepo
       .createQueryBuilder('qp')
       .innerJoin('questions', 'q', 'q.id = qp."questionId"')
-      .innerJoin('exam_type_subjects', 'ets', 'ets.id = q."examTypeSubjectId"')
+      .innerJoin(
+        'question_exam_type_subjects',
+        'qets',
+        'qets."questionId" = q.id',
+      )
+      .innerJoin(
+        'exam_type_subjects',
+        'ets',
+        'ets.id = qets."examTypeSubjectId"',
+      )
       .where('qp."studentId" = :studentId', { studentId: student.id })
       .andWhere('ets."examTypeId" = :examTypeId', {
         examTypeId: resolvedExamTypeId,
@@ -389,7 +446,8 @@ export class StudentsService {
       selectedSubjects: selectedSubjects.map((s) => ({
         id: s.subject.id,
         name: s.subject.name,
-        totalQuestions: s.subject.totalQuestions ?? 0,
+        totalQuestions: questionCountMap.get(s.subject.id)?.total ?? 0,
+        practicalCount: questionCountMap.get(s.subject.id)?.practicalCount ?? 0,
         questionsAttempted: subjectProgressMap.get(s.subject.id) ?? 0,
       })),
       stats: {
@@ -1033,7 +1091,16 @@ export class StudentsService {
       .select('SUM(qp."timesCorrect")', 'correct')
       .addSelect('SUM(qp."timesWrong")', 'wrong')
       .innerJoin('questions', 'q', 'q.id = qp."questionId"')
-      .innerJoin('exam_type_subjects', 'ets', 'ets.id = q."examTypeSubjectId"')
+      .innerJoin(
+        'question_exam_type_subjects',
+        'qets',
+        'qets."questionId" = q.id',
+      )
+      .innerJoin(
+        'exam_type_subjects',
+        'ets',
+        'ets.id = qets."examTypeSubjectId"',
+      )
       .where('qp."studentId" = :studentId', { studentId })
       .andWhere('ets."examTypeId" = :examTypeId', { examTypeId })
       .getRawOne<{ correct: string; wrong: string }>()
@@ -1229,7 +1296,16 @@ export class StudentsService {
       .addSelect('s.id', 'subjectId')
       .addSelect('s.name', 'subjectName')
       .from('questions', 'q')
-      .innerJoin('exam_type_subjects', 'ets', 'ets.id = q."examTypeSubjectId"')
+      .innerJoin(
+        'question_exam_type_subjects',
+        'qets',
+        'qets."questionId" = q.id',
+      )
+      .innerJoin(
+        'exam_type_subjects',
+        'ets',
+        'ets.id = qets."examTypeSubjectId"',
+      )
       .innerJoin('subjects', 's', 's.id = ets."subjectId"')
       .where('q.id IN (:...ids)', { ids: uniqueIds })
       .andWhere('ets."examTypeId" = :examTypeId', { examTypeId })

@@ -7,6 +7,7 @@ import {
   EmailJobs,
   SendVerificationEmailJobData,
   SendPasswordResetEmailJobData,
+  SendSetPasswordEmailJobData,
   SendOnboardingEmailJobData,
   SendWelcomeEmailJobData,
   SendSponsoredActivationEmailJobData,
@@ -31,6 +32,11 @@ export class EmailsProcessor extends WorkerHost {
       case EmailJobs.SEND_PASSWORD_RESET:
         await this.handleSendPasswordReset(
           job as Job<SendPasswordResetEmailJobData>,
+        );
+        break;
+      case EmailJobs.SEND_SET_PASSWORD:
+        await this.handleSendSetPassword(
+          job as Job<SendSetPasswordEmailJobData>,
         );
         break;
       case EmailJobs.SEND_ONBOARDING:
@@ -79,6 +85,21 @@ export class EmailsProcessor extends WorkerHost {
     } catch (err: unknown) {
       this.logger.error(
         `Password reset email failed for ${email}: ${(err as Error)?.message}`,
+      );
+      throw err;
+    }
+  }
+
+  private async handleSendSetPassword(
+    job: Job<SendSetPasswordEmailJobData>,
+  ): Promise<void> {
+    const { email, firstName, code } = job.data;
+    this.logger.log(`Sending set-password email to ${email}`);
+    try {
+      await this.emailService.sendSetPasswordEmail(email, firstName, code);
+    } catch (err: unknown) {
+      this.logger.error(
+        `Set-password email failed for ${email}: ${(err as Error)?.message}`,
       );
       throw err;
     }
@@ -147,7 +168,7 @@ export class EmailsProcessor extends WorkerHost {
   private async handleSendBulkCampaign(
     job: Job<SendBulkCampaignEmailJobData>,
   ): Promise<void> {
-    const { email, firstName, subject, htmlContent } = job.data;
+    const { email, firstName, subject, htmlContent, category } = job.data;
     this.logger.log(`Sending bulk campaign email to ${email}`);
     try {
       await this.emailService.sendBulkCampaignEmail(
@@ -155,6 +176,7 @@ export class EmailsProcessor extends WorkerHost {
         firstName,
         subject,
         htmlContent,
+        category as any,
       );
     } catch (err: unknown) {
       this.logger.error(

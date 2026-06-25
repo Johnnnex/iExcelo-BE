@@ -12,8 +12,8 @@ export class AdminProfile extends BaseEntity {
   @Column({ default: false })
   isSuper: boolean;
 
-  @Column({ nullable: true })
-  roleId: string | null;
+  @Column({ nullable: true, type: 'varchar' })
+  roleId: string;
 
   @Column({ type: 'jsonb', default: {} })
   modulePermissions: ModulePermissionsMap;
@@ -21,8 +21,8 @@ export class AdminProfile extends BaseEntity {
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ nullable: true })
-  createdById: string | null;
+  @Column({ nullable: true, type: 'varchar' })
+  createdById: string;
 
   @OneToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })

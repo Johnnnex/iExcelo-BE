@@ -85,13 +85,48 @@ export class WebhooksController {
       // Process based on event type
       switch (event.type) {
         case 'payment_intent.succeeded':
-        case 'invoice.paid':
           await this.webhookService.handlePaymentSucceeded(
             PaymentProvider.STRIPE,
             event.data.object.id,
             event.data.object.metadata || {},
           );
           break;
+
+        case 'invoice.paid': {
+          const invoice = event.data.object;
+          // Extract card info from the charge's payment method details
+          const stripeCard =
+            invoice.payment_intent?.payment_method_details?.card ??
+            invoice.charge?.payment_method_details?.card ??
+            null;
+          await this.webhookService.handlePaymentSucceeded(
+            PaymentProvider.STRIPE,
+            invoice.id,
+            invoice.metadata || {},
+            invoice.customer_email
+              ? {
+                  email: invoice.customer_email,
+                  customerCode: invoice.customer as string,
+                }
+              : undefined,
+            { amount: invoice.amount_paid, currency: invoice.currency },
+            stripeCard
+              ? {
+                  brand: stripeCard.brand ?? null,
+                  last4: stripeCard.last4 ?? null,
+                  expMonth: stripeCard.exp_month
+                    ? String(stripeCard.exp_month)
+                    : null,
+                  expYear: stripeCard.exp_year
+                    ? String(stripeCard.exp_year)
+                    : null,
+                  bank: null,
+                  channel: 'card',
+                }
+              : undefined,
+          );
+          break;
+        }
 
         case 'payment_intent.payment_failed':
         case 'invoice.payment_failed':
@@ -226,6 +261,17 @@ export class WebhooksController {
               amount: payload.data.amount,
               currency: payload.data.currency,
             },
+            // Card info from authorization object — saved to subscription for display
+            payload.data.authorization
+              ? {
+                  brand: payload.data.authorization.brand ?? null,
+                  last4: payload.data.authorization.last4 ?? null,
+                  expMonth: payload.data.authorization.exp_month ?? null,
+                  expYear: payload.data.authorization.exp_year ?? null,
+                  bank: payload.data.authorization.bank ?? null,
+                  channel: payload.data.authorization.channel ?? null,
+                }
+              : undefined,
           );
           break;
 
@@ -256,6 +302,7 @@ export class WebhooksController {
             payload.data.paid &&
             payload.data.subscription?.subscription_code
           ) {
+            const renewalAuth = payload.data.transaction?.authorization;
             await this.webhookService.handleSubscriptionRenewed(
               PaymentProvider.PAYSTACK,
               {
@@ -263,6 +310,16 @@ export class WebhooksController {
                 amount: payload.data.amount,
                 currency: payload.data.transaction?.currency || 'NGN',
                 reference: payload.data.transaction?.reference,
+                cardInfo: renewalAuth
+                  ? {
+                      brand: renewalAuth.brand ?? null,
+                      last4: renewalAuth.last4 ?? null,
+                      expMonth: renewalAuth.exp_month ?? null,
+                      expYear: renewalAuth.exp_year ?? null,
+                      bank: renewalAuth.bank ?? null,
+                      channel: renewalAuth.channel ?? null,
+                    }
+                  : undefined,
               },
             );
           }
