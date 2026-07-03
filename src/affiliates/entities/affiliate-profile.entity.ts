@@ -2,6 +2,7 @@ import { Entity, Column, OneToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { AffiliateReferral } from './affiliate-referral.entity';
 import { Commission } from './commission.entity';
+import { AffiliatePayoutAccount } from './affiliate-payout-account.entity';
 import { BaseEntity } from '../../common/entities';
 
 @Entity('affiliate_profiles')
@@ -24,9 +25,6 @@ export class AffiliateProfile extends BaseEntity {
   @Column({ default: 0 })
   totalConversions: number;
 
-  @Column({ type: 'float', default: 0 })
-  totalPaidOut: number;
-
   // Relations
   @OneToOne(() => User, (user) => user.affiliateProfile, {
     onDelete: 'CASCADE',
@@ -39,4 +37,7 @@ export class AffiliateProfile extends BaseEntity {
 
   @OneToMany(() => Commission, (commission) => commission.affiliate)
   commissions: Commission[];
+
+  @OneToMany(() => AffiliatePayoutAccount, (account) => account.affiliate)
+  payoutAccounts: AffiliatePayoutAccount[];
 }

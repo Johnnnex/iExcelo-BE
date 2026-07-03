@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Query,
   Param,
@@ -176,12 +177,27 @@ export class AffiliatesController {
   }
 
   /**
-   * POST /affiliates/withdraw — Request withdrawal from pending balance
+   * GET /affiliates/balances — Per-currency available balances for withdrawal
+   */
+  @Get('balances')
+  async getBalances(@CurrentUser() user: User) {
+    const profile = await this.affiliatesService.findByUserId(user.id);
+    if (!profile) throw new NotFoundException('Affiliate profile not found');
+    const data = await this.affiliatesService.getAvailableBalanceByCurrency(
+      profile.id,
+    );
+    return { message: 'Balances retrieved', data };
+  }
+
+  /**
+   * POST /affiliates/withdraw — Request withdrawal for a specific currency
    */
   @Post('withdraw')
   async requestWithdrawal(
     @CurrentUser() user: User,
     @Body('amount') amount: number,
+    @Body('currency') currency: Currency,
+    @Body('payoutAccountId') payoutAccountId: string,
   ) {
     const profile = await this.affiliatesService.findByUserId(user.id);
     if (!profile) {
@@ -190,8 +206,79 @@ export class AffiliatesController {
     const payout = await this.affiliatesService.requestWithdrawal(
       profile.id,
       amount,
+      currency,
+      payoutAccountId,
     );
     return { message: 'Withdrawal requested', data: payout };
+  }
+
+  // ─── Payout Accounts ─────────────────────────────────────────────
+
+  /**
+   * GET /affiliates/payout-accounts — List all payout accounts
+   */
+  @Get('payout-accounts')
+  async listPayoutAccounts(@CurrentUser() user: User) {
+    const profile = await this.affiliatesService.findByUserId(user.id);
+    if (!profile) throw new NotFoundException('Affiliate profile not found');
+    const data = await this.affiliatesService.listPayoutAccounts(profile.id);
+    return { message: 'Payout accounts retrieved', data };
+  }
+
+  /**
+   * POST /affiliates/payout-accounts — Add a payout account
+   */
+  @Post('payout-accounts')
+  async addPayoutAccount(
+    @CurrentUser() user: User,
+    @Body()
+    body: {
+      currency: Currency;
+      bankName: string;
+      accountNumber: string;
+      accountName: string;
+      bankCode?: string;
+      setAsDefault?: boolean;
+    },
+  ) {
+    const profile = await this.affiliatesService.findByUserId(user.id);
+    if (!profile) throw new NotFoundException('Affiliate profile not found');
+    const data = await this.affiliatesService.addPayoutAccount(
+      profile.id,
+      body,
+    );
+    return { message: 'Payout account added', data };
+  }
+
+  /**
+   * PATCH /affiliates/payout-accounts/:id/default — Set as default
+   */
+  @Patch('payout-accounts/:id/default')
+  async setDefaultPayoutAccount(
+    @CurrentUser() user: User,
+    @Param('id') accountId: string,
+  ) {
+    const profile = await this.affiliatesService.findByUserId(user.id);
+    if (!profile) throw new NotFoundException('Affiliate profile not found');
+    const data = await this.affiliatesService.setDefaultPayoutAccount(
+      profile.id,
+      accountId,
+    );
+    return { message: 'Default payout account updated', data };
+  }
+
+  /**
+   * DELETE /affiliates/payout-accounts/:id — Remove a payout account
+   */
+  @Delete('payout-accounts/:id')
+  async removePayoutAccount(
+    @CurrentUser() user: User,
+    @Param('id') accountId: string,
+  ) {
+    const profile = await this.affiliatesService.findByUserId(user.id);
+    if (!profile) throw new NotFoundException('Affiliate profile not found');
+    await this.affiliatesService.removePayoutAccount(profile.id, accountId);
+    return { message: 'Payout account removed' };
   }
 
   /**

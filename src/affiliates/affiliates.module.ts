@@ -6,6 +6,7 @@ import { AffiliateProfile } from './entities/affiliate-profile.entity';
 import { AffiliateReferral } from './entities/affiliate-referral.entity';
 import { Commission } from './entities/commission.entity';
 import { AffiliatePayout } from './entities/affiliate-payout.entity';
+import { AffiliatePayoutAccount } from './entities/affiliate-payout-account.entity';
 import { LoggerModule } from '../logger/logger.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 
@@ -16,6 +17,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
       AffiliateReferral,
       Commission,
       AffiliatePayout,
+      AffiliatePayoutAccount,
     ]),
     LoggerModule,
     AnalyticsModule,

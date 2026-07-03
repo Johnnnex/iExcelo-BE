@@ -39,6 +39,7 @@ import { StudentProfile } from '../students/entities/student-profile.entity';
 import { SponsorProfile } from '../sponsors/entities/sponsor-profile.entity';
 import { AffiliateProfile } from '../affiliates/entities/affiliate-profile.entity';
 import { AffiliatePayout } from '../affiliates/entities/affiliate-payout.entity';
+import { AffiliatePayoutAccount } from '../affiliates/entities/affiliate-payout-account.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { SubscriptionPlan } from '../subscriptions/entities/subscription-plan.entity';
 import { PlanPrice } from '../subscriptions/entities/plan-price.entity';
@@ -73,6 +74,7 @@ import { EMAILS_QUEUE } from '../email/queue/email.queue';
       SponsorProfile,
       AffiliateProfile,
       AffiliatePayout,
+      AffiliatePayoutAccount,
       Subscription,
       SubscriptionPlan,
       PlanPrice,

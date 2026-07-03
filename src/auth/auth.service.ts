@@ -1222,16 +1222,13 @@ export class AuthService {
       // Don't let affiliates refer themselves
       if (affiliate.userId === userId) return;
 
-      // Map UserType to ReferredUserType
-      const referredUserType =
-        userType === UserType.SPONSOR
-          ? ReferredUserType.SPONSOR
-          : ReferredUserType.STUDENT;
+      // Only student sign-ups count as referrals
+      if (userType !== UserType.STUDENT) return;
 
       await this.affiliatesService.createReferral({
         affiliateId: affiliate.id,
         referredUserId: userId,
-        userType: referredUserType,
+        userType: ReferredUserType.STUDENT,
       });
     } catch {
       // Silently ignore referral errors — don't block signup

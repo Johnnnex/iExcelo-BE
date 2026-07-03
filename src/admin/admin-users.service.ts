@@ -280,6 +280,7 @@ export class AdminUsersService {
   async listPayouts(affiliateId: string, page: number, limit: number) {
     const [items, total] = await this.affiliatePayoutRepo.findAndCount({
       where: { affiliateId },
+      relations: ['payoutAccount'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -308,7 +309,6 @@ export class AdminUsersService {
         0,
         profile.pendingBalance - payout.amount,
       );
-      profile.totalPaidOut += payout.amount;
       await this.affiliateProfileRepo.save(profile);
     }
 
@@ -336,7 +336,7 @@ export class AdminUsersService {
 
     const [items, total] = await this.affiliatePayoutRepo.findAndCount({
       where,
-      relations: ['affiliate', 'affiliate.user'],
+      relations: ['affiliate', 'affiliate.user', 'payoutAccount'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,

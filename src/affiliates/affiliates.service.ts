@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { DAY_MS } from '../common/constants';
@@ -6,6 +10,7 @@ import { AffiliateProfile } from './entities/affiliate-profile.entity';
 import { AffiliateReferral } from './entities/affiliate-referral.entity';
 import { Commission } from './entities/commission.entity';
 import { AffiliatePayout } from './entities/affiliate-payout.entity';
+import { AffiliatePayoutAccount } from './entities/affiliate-payout-account.entity';
 import { LoggerService } from '../logger/logger.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import {
@@ -17,6 +22,22 @@ import {
 } from '../../types';
 
 const COMMISSION_RATE = 0.15; // 15%
+
+function redactEmail(email: string): string {
+  const atIdx = email.indexOf('@');
+  if (atIdx === -1) return email;
+  const local = email.slice(0, atIdx);
+  const domain = email.slice(atIdx);
+  let masked: string;
+  if (local.length <= 4) {
+    masked = local.slice(0, 2) + '***';
+  } else if (local.length <= 7) {
+    masked = local.slice(0, 4) + '***';
+  } else {
+    masked = local.slice(0, 4) + '***' + local.slice(-3);
+  }
+  return masked + domain;
+}
 
 /**
  * Get the calendar date parts (year, month-0indexed, day, day-of-week)
@@ -66,6 +87,8 @@ export class AffiliatesService {
     private commissionRepo: Repository<Commission>,
     @InjectRepository(AffiliatePayout)
     private affiliatePayoutRepo: Repository<AffiliatePayout>,
+    @InjectRepository(AffiliatePayoutAccount)
+    private payoutAccountRepo: Repository<AffiliatePayoutAccount>,
     private loggerService: LoggerService,
     private analyticsService: AnalyticsService,
   ) {}
@@ -289,7 +312,7 @@ export class AffiliatesService {
 
     let totalEarnings = profile.totalEarnings;
     let pendingBalance = profile.pendingBalance;
-    let totalPaidOut = profile.totalPaidOut;
+    let totalPaidOut = 0;
 
     if (currency) {
       // Compute earnings for this specific currency from commissions
@@ -310,8 +333,24 @@ export class AffiliatesService {
         .getRawOne<{ total: string }>();
       pendingBalance = parseFloat(pendingResult?.total || '0');
 
-      // totalPaidOut for currency = totalEarnings - pendingBalance
-      totalPaidOut = totalEarnings - pendingBalance;
+      // totalPaidOut = sum of completed payouts in this currency
+      const paidOutResult = await this.affiliatePayoutRepo
+        .createQueryBuilder('p')
+        .select('COALESCE(SUM(p.amount), 0)', 'total')
+        .where('p.affiliateId = :affiliateId', { affiliateId: profile.id })
+        .andWhere('p.currency = :currency', { currency })
+        .andWhere('p.status = :status', { status: PayoutStatus.COMPLETED })
+        .getRawOne<{ total: string }>();
+      totalPaidOut = parseFloat(paidOutResult?.total || '0');
+    } else {
+      // Aggregate totalPaidOut across all currencies from completed payouts
+      const paidOutResult = await this.affiliatePayoutRepo
+        .createQueryBuilder('p')
+        .select('COALESCE(SUM(p.amount), 0)', 'total')
+        .where('p.affiliateId = :affiliateId', { affiliateId: profile.id })
+        .andWhere('p.status = :status', { status: PayoutStatus.COMPLETED })
+        .getRawOne<{ total: string }>();
+      totalPaidOut = parseFloat(paidOutResult?.total || '0');
     }
 
     // Get previous month stats for comparison
@@ -413,6 +452,9 @@ export class AffiliatesService {
 
           return {
             ...referral,
+            referredUser: referral.referredUser
+              ? { ...referral.referredUser, email: redactEmail(referral.referredUser.email) }
+              : referral.referredUser,
             totalRevenueGenerated: parseFloat(commissionSum?.revenue || '0'),
             totalCommissionGenerated: parseFloat(
               commissionSum?.commission || '0',
@@ -434,6 +476,9 @@ export class AffiliatesService {
 
         return {
           ...referral,
+          referredUser: referral.referredUser
+            ? { ...referral.referredUser, email: redactEmail(referral.referredUser.email) }
+            : referral.referredUser,
           totalCommissionGenerated: parseFloat(
             commissionSum?.commission || '0',
           ),
@@ -681,42 +726,68 @@ export class AffiliatesService {
   }
 
   /**
-   * Request a withdrawal from pending balance
+   * Request a withdrawal for a specific currency from pending commissions.
+   * Validates against per-currency pending commission balance (not the profile-level float).
    */
   async requestWithdrawal(
     affiliateId: string,
     amount: number,
+    currency: Currency,
+    payoutAccountId: string,
   ): Promise<AffiliatePayout> {
-    const profile = await this.affiliateProfileRepo.findOne({
-      where: { id: affiliateId },
-    });
-
-    if (!profile) {
-      throw new BadRequestException('Affiliate profile not found');
-    }
-
     if (amount <= 0) {
       throw new BadRequestException('Withdrawal amount must be greater than 0');
     }
 
-    if (amount > profile.pendingBalance) {
-      throw new BadRequestException('Insufficient pending balance');
+    // Verify payout account belongs to this affiliate and matches currency
+    const account = await this.payoutAccountRepo.findOne({
+      where: { id: payoutAccountId, affiliateId, currency },
+    });
+    if (!account) {
+      throw new BadRequestException(
+        'Payout account not found or currency mismatch',
+      );
+    }
+
+    // Compute per-currency pending balance from commissions minus pending payouts
+    const pendingCommissionsResult = await this.commissionRepo
+      .createQueryBuilder('c')
+      .select('COALESCE(SUM(c.amount), 0)', 'total')
+      .where('c.affiliateId = :affiliateId', { affiliateId })
+      .andWhere('c.currency = :currency', { currency })
+      .andWhere('c.status = :status', { status: CommissionStatus.PENDING })
+      .getRawOne<{ total: string }>();
+    const pendingCommissions = parseFloat(
+      pendingCommissionsResult?.total || '0',
+    );
+
+    const inFlightResult = await this.affiliatePayoutRepo
+      .createQueryBuilder('p')
+      .select('COALESCE(SUM(p.amount), 0)', 'total')
+      .where('p.affiliateId = :affiliateId', { affiliateId })
+      .andWhere('p.currency = :currency', { currency })
+      .andWhere('p.status IN (:...statuses)', {
+        statuses: [PayoutStatus.PENDING, PayoutStatus.PROCESSING],
+      })
+      .getRawOne<{ total: string }>();
+    const inFlight = parseFloat(inFlightResult?.total || '0');
+
+    const available = pendingCommissions - inFlight;
+    if (amount > available) {
+      throw new BadRequestException(
+        `Insufficient ${currency} balance. Available: ${available.toFixed(2)}`,
+      );
     }
 
     const payout = this.affiliatePayoutRepo.create({
       affiliateId,
+      payoutAccountId,
       amount,
+      currency,
       status: PayoutStatus.PENDING,
     });
 
     const savedPayout = await this.affiliatePayoutRepo.save(payout);
-
-    // Decrement pending balance
-    await this.affiliateProfileRepo.decrement(
-      { id: affiliateId },
-      'pendingBalance',
-      amount,
-    );
 
     await this.loggerService.log({
       action: LogActionTypes.PAYMENT,
@@ -724,6 +795,8 @@ export class AffiliatesService {
       metadata: {
         affiliateId,
         amount,
+        currency,
+        payoutAccountId,
         payoutId: savedPayout.id,
       },
     });
@@ -788,6 +861,142 @@ export class AffiliatesService {
     }
 
     return { available: true, message: 'This code is available' };
+  }
+
+  // ─── Payout Account CRUD ─────────────────────────────────────────
+
+  async listPayoutAccounts(
+    affiliateId: string,
+  ): Promise<AffiliatePayoutAccount[]> {
+    return this.payoutAccountRepo.find({
+      where: { affiliateId },
+      order: { isDefault: 'DESC', createdAt: 'ASC' },
+    });
+  }
+
+  async addPayoutAccount(
+    affiliateId: string,
+    data: {
+      currency: Currency;
+      bankName: string;
+      accountNumber: string;
+      accountName: string;
+      bankCode?: string;
+      setAsDefault?: boolean;
+    },
+  ): Promise<AffiliatePayoutAccount> {
+    const existing = await this.payoutAccountRepo.count({
+      where: { affiliateId },
+    });
+
+    const account = this.payoutAccountRepo.create({
+      affiliateId,
+      currency: data.currency,
+      bankName: data.bankName,
+      accountNumber: data.accountNumber,
+      accountName: data.accountName,
+      bankCode: data.bankCode ?? null,
+      isDefault: data.setAsDefault ?? existing === 0, // First account is auto-default
+    });
+
+    if (account.isDefault) {
+      // Clear previous default for this affiliate
+      await this.payoutAccountRepo.update(
+        { affiliateId },
+        { isDefault: false },
+      );
+    }
+
+    return this.payoutAccountRepo.save(account);
+  }
+
+  async removePayoutAccount(
+    affiliateId: string,
+    accountId: string,
+  ): Promise<void> {
+    const account = await this.payoutAccountRepo.findOne({
+      where: { id: accountId, affiliateId },
+    });
+    if (!account) throw new NotFoundException('Payout account not found');
+
+    await this.payoutAccountRepo.remove(account);
+
+    // If we removed the default, promote the most recent remaining account
+    if (account.isDefault) {
+      const next = await this.payoutAccountRepo.findOne({
+        where: { affiliateId },
+        order: { createdAt: 'ASC' },
+      });
+      if (next) {
+        next.isDefault = true;
+        await this.payoutAccountRepo.save(next);
+      }
+    }
+  }
+
+  async setDefaultPayoutAccount(
+    affiliateId: string,
+    accountId: string,
+  ): Promise<AffiliatePayoutAccount> {
+    const account = await this.payoutAccountRepo.findOne({
+      where: { id: accountId, affiliateId },
+    });
+    if (!account) throw new NotFoundException('Payout account not found');
+
+    await this.payoutAccountRepo.update({ affiliateId }, { isDefault: false });
+    account.isDefault = true;
+    return this.payoutAccountRepo.save(account);
+  }
+
+  /**
+   * Get available per-currency pending balance for withdrawal requests.
+   * = sum(pending commissions in currency) - sum(pending/processing payouts in currency)
+   */
+  async getAvailableBalanceByCurrency(
+    affiliateId: string,
+  ): Promise<{ currency: string; available: number; totalEarned: number }[]> {
+    const currencies = await this.commissionRepo
+      .createQueryBuilder('c')
+      .select('c.currency', 'currency')
+      .where('c.affiliateId = :affiliateId', { affiliateId })
+      .groupBy('c.currency')
+      .getRawMany<{ currency: string }>();
+
+    return Promise.all(
+      currencies.map(async ({ currency }) => {
+        const earnedResult = await this.commissionRepo
+          .createQueryBuilder('c')
+          .select('COALESCE(SUM(c.amount), 0)', 'total')
+          .where('c.affiliateId = :affiliateId', { affiliateId })
+          .andWhere('c.currency = :currency', { currency })
+          .getRawOne<{ total: string }>();
+
+        const inFlightResult = await this.affiliatePayoutRepo
+          .createQueryBuilder('p')
+          .select('COALESCE(SUM(p.amount), 0)', 'total')
+          .where('p.affiliateId = :affiliateId', { affiliateId })
+          .andWhere('p.currency = :currency', { currency })
+          .andWhere('p.status IN (:...statuses)', {
+            statuses: [PayoutStatus.PENDING, PayoutStatus.PROCESSING],
+          })
+          .getRawOne<{ total: string }>();
+
+        const completedResult = await this.affiliatePayoutRepo
+          .createQueryBuilder('p')
+          .select('COALESCE(SUM(p.amount), 0)', 'total')
+          .where('p.affiliateId = :affiliateId', { affiliateId })
+          .andWhere('p.currency = :currency', { currency })
+          .andWhere('p.status = :status', { status: PayoutStatus.COMPLETED })
+          .getRawOne<{ total: string }>();
+
+        const totalEarned = parseFloat(earnedResult?.total || '0');
+        const inFlight = parseFloat(inFlightResult?.total || '0');
+        const completed = parseFloat(completedResult?.total || '0');
+        const available = totalEarned - completed - inFlight;
+
+        return { currency, available: Math.max(0, available), totalEarned };
+      }),
+    );
   }
 
   async updateAffiliateCode(

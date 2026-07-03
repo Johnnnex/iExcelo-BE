@@ -1245,7 +1245,7 @@ export class ExamsService {
       relations: ['subject'],
     });
     if (!topic) throw new NotFoundException('Topic not found');
-    return topic;
+    return { ...topic, subjectName: topic.subject?.name ?? null };
   }
 
   // ─── Mock Config ──────────────────────────────────────────────────────────

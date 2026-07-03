@@ -1,10 +1,14 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { AffiliateProfile } from './affiliate-profile.entity';
 import { AffiliateReferral } from './affiliate-referral.entity';
 import { Subscription } from '../../subscriptions/entities/subscription.entity';
 import { CommissionStatus, Currency } from '../../../types';
 import { BaseEntity } from '../../common/entities';
 
+// covering index for getEarningsByCurrency (affiliateId filter + currency group + amount sum)
+@Index(['affiliateId', 'currency', 'amount'])
+// index for date-range dashboard queries (affiliateId filter + currency + createdAt range)
+@Index(['affiliateId', 'currency', 'createdAt'])
 @Entity('commissions')
 export class Commission extends BaseEntity {
   @Column()
