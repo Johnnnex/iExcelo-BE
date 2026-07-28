@@ -1829,6 +1829,90 @@ export class SubscriptionsService {
     }
   }
 
+  /**
+   * Upgrade a Stripe subscription to a different price in-place.
+   * Stripe handles proration automatically — no cancel-and-recreate needed.
+   */
+  async upgradeStripeSubscription(
+    stripeSubscriptionId: string,
+    newStripePriceId: string,
+    newPlanId: string,
+    newPlanPriceId: string,
+  ): Promise<void> {
+    if (!this.stripe) throw new Error('Stripe not configured');
+
+    const sub = await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const itemId = sub.items.data[0]?.id;
+    if (!itemId) throw new Error('No subscription item found');
+
+    await this.stripe.subscriptions.update(stripeSubscriptionId, {
+      items: [{ id: itemId, price: newStripePriceId }],
+      proration_behavior: 'create_prorations',
+    });
+
+    // Update our DB record with the new plan
+    await this.subscriptionRepo.update(
+      { providerSubscriptionId: stripeSubscriptionId },
+      { planId: newPlanId, planPriceId: newPlanPriceId },
+    );
+  }
+
+  /**
+   * Cancel a Stripe subscription immediately (stops future charges).
+   */
+  async cancelStripeSubscription(subscriptionId: string): Promise<boolean> {
+    if (!this.stripe) return false;
+    try {
+      await this.stripe.subscriptions.cancel(subscriptionId);
+      return true;
+    } catch (err) {
+      this.logger.error(`Stripe cancel error: ${err}`);
+      return false;
+    }
+  }
+
+  /**
+   * Create a Stripe Billing Portal session for the customer to manage their
+   * payment method (update card, view invoices, etc.).
+   * Requires the Billing Portal to be configured in the Stripe Dashboard.
+   */
+  async getStripeManageLink(
+    customerId: string,
+    returnUrl: string,
+  ): Promise<string | null> {
+    if (!this.stripe || !customerId) return null;
+    try {
+      const session = await this.stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: returnUrl,
+      });
+      return session.url;
+    } catch (err) {
+      this.logger.error(`Stripe portal error: ${err}`);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch the next billing date from Stripe for a subscription.
+   * Returns an ISO string from current_period_end.
+   */
+  async getStripeNextPaymentDate(
+    subscriptionId: string,
+  ): Promise<string | null> {
+    if (!this.stripe) return null;
+    try {
+      const sub = (await this.stripe.subscriptions.retrieve(
+        subscriptionId,
+      )) as unknown as Stripe.Subscription & { current_period_end: number };
+      return sub.current_period_end
+        ? new Date(sub.current_period_end * 1000).toISOString()
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   async getBillingHistory(
     studentId: string,
     page = 1,

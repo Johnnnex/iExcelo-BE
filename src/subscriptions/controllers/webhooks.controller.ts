@@ -85,46 +85,82 @@ export class WebhooksController {
       // Process based on event type
       switch (event.type) {
         case 'payment_intent.succeeded':
-          await this.webhookService.handlePaymentSucceeded(
-            PaymentProvider.STRIPE,
-            event.data.object.id,
-            event.data.object.metadata || {},
-          );
+        case 'checkout.session.completed':
+        case 'customer.created':
+        case 'payment_method.attached':
+        case 'invoice.created':
+        case 'invoice.finalized':
+        case 'charge.succeeded':
+        case 'invoice_payment.paid':
+          // Informational events fired as side effects of the checkout flow.
+          // invoice_payment.paid is a newer alias; invoice.paid fires alongside it
+          // and handles activation. Acknowledge these to suppress WARN logs.
           break;
 
-        case 'invoice.paid': {
+        case 'invoice.paid':
+        case 'invoice.payment_succeeded': {
           const invoice = event.data.object;
-          // Extract card info from the charge's payment method details
+
+          // subscription_data.metadata is echoed on every invoice under
+          // subscription_details.metadata — this is where our subscriptionId lives.
+          // invoice.metadata itself is always empty for subscription invoices.
+          const subMeta =
+            invoice.subscription_details?.metadata || invoice.metadata || {};
+          const subscriptionId: string | undefined = subMeta.subscriptionId;
+
           const stripeCard =
             invoice.payment_intent?.payment_method_details?.card ??
             invoice.charge?.payment_method_details?.card ??
             null;
-          await this.webhookService.handlePaymentSucceeded(
-            PaymentProvider.STRIPE,
-            invoice.id,
-            invoice.metadata || {},
-            invoice.customer_email
-              ? {
-                  email: invoice.customer_email,
-                  customerCode: invoice.customer as string,
-                }
-              : undefined,
-            { amount: invoice.amount_paid, currency: invoice.currency },
-            stripeCard
-              ? {
-                  brand: stripeCard.brand ?? null,
-                  last4: stripeCard.last4 ?? null,
-                  expMonth: stripeCard.exp_month
-                    ? String(stripeCard.exp_month)
-                    : null,
-                  expYear: stripeCard.exp_year
-                    ? String(stripeCard.exp_year)
-                    : null,
-                  bank: null,
-                  channel: 'card',
-                }
-              : undefined,
-          );
+          const cardInfo = stripeCard
+            ? {
+                brand: stripeCard.brand ?? null,
+                last4: stripeCard.last4 ?? null,
+                expMonth: stripeCard.exp_month
+                  ? String(stripeCard.exp_month)
+                  : null,
+                expYear: stripeCard.exp_year
+                  ? String(stripeCard.exp_year)
+                  : null,
+                bank: null,
+                channel: 'card',
+              }
+            : undefined;
+
+          const customerInfo = {
+            email: invoice.customer_email ?? undefined,
+            customerCode: invoice.customer as string,
+          };
+
+          const paymentData = {
+            amount: invoice.amount_paid,
+            currency: invoice.currency,
+          };
+
+          if (invoice.billing_reason === 'subscription_cycle') {
+            // Renewal — extend the existing subscription period
+            const subscriptionCode = invoice.subscription as string;
+            await this.webhookService.handleSubscriptionRenewed(
+              PaymentProvider.STRIPE,
+              {
+                subscriptionCode,
+                amount: invoice.amount_paid,
+                currency: invoice.currency,
+                reference: invoice.id,
+                cardInfo,
+              },
+            );
+          } else {
+            // First payment (billing_reason = 'subscription_create' or 'manual')
+            await this.webhookService.handlePaymentSucceeded(
+              PaymentProvider.STRIPE,
+              invoice.id,
+              { subscriptionId },
+              customerInfo,
+              paymentData,
+              cardInfo,
+            );
+          }
           break;
         }
 
@@ -138,18 +174,39 @@ export class WebhooksController {
           );
           break;
 
-        case 'customer.subscription.created':
-          // Store the Stripe subscription ID on our DB subscription for future event matching
-          await this.webhookService.handleSubscriptionCreated(
-            PaymentProvider.STRIPE,
-            {
-              subscriptionCode: event.data.object.id,
-              planCode: event.data.object.items?.data?.[0]?.price?.id || '',
-              customerCode: event.data.object.customer,
-              customerEmail: event.data.object.customer_email || '',
-            },
-          );
+        case 'customer.subscription.created': {
+          const stripeSub = event.data.object;
+          // subscription_data.metadata carries our subscriptionId — use it for
+          // a direct match instead of plan-code matching (plan codes are dynamic
+          // Stripe IDs when pre-configured stripePriceIds aren't set).
+          const subscriptionId: string | undefined =
+            stripeSub.metadata?.subscriptionId;
+          if (subscriptionId) {
+            await this.webhookService.handleSubscriptionCreated(
+              PaymentProvider.STRIPE,
+              {
+                subscriptionCode: stripeSub.id,
+                planCode: '',
+                customerCode: stripeSub.customer as string,
+                customerEmail: '',
+                // Direct DB subscription ID — skip plan-code matching entirely
+                directSubscriptionId: subscriptionId,
+              },
+            );
+          } else {
+            // Fallback: match by planCode (only works if stripePriceId is configured)
+            await this.webhookService.handleSubscriptionCreated(
+              PaymentProvider.STRIPE,
+              {
+                subscriptionCode: stripeSub.id,
+                planCode: stripeSub.items?.data?.[0]?.price?.id || '',
+                customerCode: stripeSub.customer as string,
+                customerEmail: stripeSub.customer_email || '',
+              },
+            );
+          }
           break;
+        }
 
         case 'customer.subscription.deleted':
           await this.webhookService.handleSubscriptionCancelled(

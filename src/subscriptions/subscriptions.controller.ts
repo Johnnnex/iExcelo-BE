@@ -180,7 +180,7 @@ export class SubscriptionsController {
         data: {
           provider: 'stripe',
           sessionId: result.sessionId,
-          url: result.url,
+          authorizationUrl: result.authorizationUrl,
         },
       };
     } else if (checkoutInfo.provider === PaymentProvider.PAYSTACK) {
@@ -320,19 +320,25 @@ export class SubscriptionsController {
         examTypeId,
       );
 
-    // Fetch next_payment_date from Paystack for recurring active subs
+    // Fetch next_payment_date from the payment provider for recurring active subs
     let nextPaymentDate: string | null = null;
     if (
       subscription?.status === SubscriptionStatus.ACTIVE &&
       subscription.autoRenew &&
-      subscription.providerSubscriptionId &&
-      subscription.paymentProvider === PaymentProvider.PAYSTACK
+      subscription.providerSubscriptionId
     ) {
-      const paystackSub =
-        await this.subscriptionsService.fetchPaystackSubscription(
-          subscription.providerSubscriptionId,
-        );
-      nextPaymentDate = paystackSub?.next_payment_date ?? null;
+      if (subscription.paymentProvider === PaymentProvider.PAYSTACK) {
+        const paystackSub =
+          await this.subscriptionsService.fetchPaystackSubscription(
+            subscription.providerSubscriptionId,
+          );
+        nextPaymentDate = paystackSub?.next_payment_date ?? null;
+      } else if (subscription.paymentProvider === PaymentProvider.STRIPE) {
+        nextPaymentDate =
+          await this.subscriptionsService.getStripeNextPaymentDate(
+            subscription.providerSubscriptionId,
+          );
+      }
     }
 
     // Upcoming (SCHEDULED) sub: only shown when current sub is CANCELLED
@@ -492,16 +498,29 @@ export class SubscriptionsController {
       return { success: true, message: 'No manage link available', data: null };
     }
 
-    const link = await this.subscriptionsService.getPaystackManageLink(
-      subscription.providerSubscriptionId,
-    );
+    let link: string | null = null;
+
+    if (subscription.paymentProvider === PaymentProvider.PAYSTACK) {
+      link = await this.subscriptionsService.getPaystackManageLink(
+        subscription.providerSubscriptionId,
+      );
+    } else if (
+      subscription.paymentProvider === PaymentProvider.STRIPE &&
+      subscription.providerCustomerId
+    ) {
+      const baseUrl = req.headers.origin || 'http://localhost:3001';
+      link = await this.subscriptionsService.getStripeManageLink(
+        subscription.providerCustomerId,
+        `${baseUrl}/student/settings/billing`,
+      );
+    }
 
     return {
       success: true,
       message: link
         ? 'Manage link generated'
         : 'Unable to generate manage link',
-      data: link ? { link } : null,
+      data: link ? { link, provider: subscription.paymentProvider } : null,
     };
   }
 
@@ -538,6 +557,10 @@ export class SubscriptionsController {
     if (subscription.providerSubscriptionId) {
       if (subscription.paymentProvider === PaymentProvider.PAYSTACK) {
         await this.subscriptionsService.cancelPaystackSubscription(
+          subscription.providerSubscriptionId,
+        );
+      } else if (subscription.paymentProvider === PaymentProvider.STRIPE) {
+        await this.subscriptionsService.cancelStripeSubscription(
           subscription.providerSubscriptionId,
         );
       }
@@ -593,9 +616,37 @@ export class SubscriptionsController {
       );
     }
 
+    // Stripe reactivation: old subscription is cancelled (gone at Stripe).
+    // Return a fresh checkout URL so the student re-subscribes on the same plan.
+    if (subscription.paymentProvider === PaymentProvider.STRIPE) {
+      const baseUrl = req.headers.origin || 'http://localhost:3001';
+      const successUrl = `${baseUrl}/student/upgrade/confirmed`;
+      const cancelUrl = `${baseUrl}/student/subscriptions?examTypeId=${examTypeId}`;
+
+      const result = await this.checkoutService.createStripeCheckoutSession({
+        studentId,
+        examTypeId,
+        planId: subscription.planId,
+        currency: subscription.currency,
+        successUrl,
+        cancelUrl,
+        customerEmail: req.user.email,
+      });
+
+      return {
+        success: true,
+        message: 'Redirecting to checkout to reactivate subscription',
+        data: {
+          requiresCheckout: true,
+          authorizationUrl: result.authorizationUrl,
+          sessionId: result.sessionId,
+        },
+      };
+    }
+
     if (subscription.paymentProvider !== PaymentProvider.PAYSTACK) {
       throw new BadRequestException(
-        'Reactivation is currently only supported for Paystack subscriptions',
+        'Reactivation is not supported for this payment provider',
       );
     }
 
@@ -707,9 +758,40 @@ export class SubscriptionsController {
       );
     }
 
+    // Stripe upgrade: update the subscription's price in-place.
+    // Stripe handles proration natively — no cancel-then-create needed.
+    if (subscription.paymentProvider === PaymentProvider.STRIPE) {
+      if (!subscription.providerSubscriptionId) {
+        throw new BadRequestException('Missing provider subscription details');
+      }
+
+      const targetPrice = await this.subscriptionsService.findPlanPrice(
+        dto.targetPlanId,
+        subscription.currency,
+      );
+
+      if (!targetPrice?.stripePriceId) {
+        throw new BadRequestException(
+          'Target plan not configured for Stripe. Please contact support.',
+        );
+      }
+
+      await this.subscriptionsService.upgradeStripeSubscription(
+        subscription.providerSubscriptionId,
+        targetPrice.stripePriceId,
+        dto.targetPlanId,
+        targetPrice.id,
+      );
+
+      return {
+        success: true,
+        message: 'Subscription upgraded successfully',
+      };
+    }
+
     if (subscription.paymentProvider !== PaymentProvider.PAYSTACK) {
       throw new BadRequestException(
-        'Upgrade is currently only supported for Paystack subscriptions',
+        'Upgrade is not supported for this payment provider',
       );
     }
 

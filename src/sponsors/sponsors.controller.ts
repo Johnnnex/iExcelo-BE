@@ -263,6 +263,7 @@ export class SponsorsController {
       planPriceId: string;
       customerEmail: string;
       callbackUrl: string;
+      region?: string;
     },
   ) {
     const data = await this.sponsorsService.initiateSponsorSubscriptionGiveback(
@@ -276,11 +277,11 @@ export class SponsorsController {
   @HttpCode(HttpStatus.OK)
   async verifyGiveback(
     @Req() req: Request & { user: User },
-    @Body() body: { reference: string },
+    @Body() body: { reference?: string; sessionId?: string },
   ) {
     const data = await this.sponsorsService.verifySponsorGiveback(
       req.user.id,
-      body.reference,
+      body,
     );
     return { success: true, data };
   }
@@ -318,6 +319,7 @@ export class SponsorsController {
       planPriceId: string;
       customerEmail: string;
       callbackUrl: string;
+      region?: string;
     },
   ) {
     const data = await this.sponsorsService.initiateResubGiveback(req.user.id, {

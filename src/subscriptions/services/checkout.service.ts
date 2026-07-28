@@ -35,7 +35,11 @@ export class CheckoutService {
   }
 
   /**
-   * Create a Stripe checkout session for subscription
+   * Create a Stripe checkout session for subscription.
+   *
+   * Uses a pre-configured stripePriceId when available (preferred — avoids
+   * creating a new Price object on every checkout).  Falls back to inline
+   * price_data for currencies/plans that haven't been seeded yet.
    */
   async createStripeCheckoutSession(data: {
     studentId: string;
@@ -45,12 +49,11 @@ export class CheckoutService {
     successUrl: string;
     cancelUrl: string;
     customerEmail?: string;
-  }): Promise<{ sessionId: string; url: string }> {
+  }): Promise<{ sessionId: string; authorizationUrl: string }> {
     if (!this.stripe) {
       throw new BadRequestException('Stripe is not configured');
     }
 
-    // Get plan and price
     const plan = await this.planRepo.findOne({
       where: { id: data.planId, isActive: true },
     });
@@ -71,40 +74,42 @@ export class CheckoutService {
       throw new BadRequestException(`Price not available for ${data.currency}`);
     }
 
-    // Create pending subscription in our database first
     const subscription = await this.subscriptionsService.createSubscription({
       studentId: data.studentId,
       examTypeId: data.examTypeId,
       planId: data.planId,
-      planPriceId: price.id, // Link to the exact price being purchased
+      planPriceId: price.id,
       provider: PaymentProvider.STRIPE,
       currency: data.currency,
       amount: price.amount,
     });
 
-    // Create Stripe checkout session
-    // If we have a pre-configured stripePriceId, use it; otherwise create dynamic price
+    // Build line items — prefer a pre-configured Stripe Price ID so that
+    // Stripe can match events back to a known price and avoid orphan Price objects.
+    const lineItem: Stripe.Checkout.SessionCreateParams.LineItem =
+      price.stripePriceId
+        ? { price: price.stripePriceId, quantity: 1 }
+        : {
+            price_data: {
+              currency: data.currency.toLowerCase(),
+              product_data: {
+                name: `iExcelo - ${plan.name}`,
+                description:
+                  plan.description || `${plan.durationDays} days access`,
+              },
+              unit_amount: Math.round(price.amount * 100),
+              recurring: {
+                interval: 'day',
+                interval_count: plan.durationDays,
+              },
+            },
+            quantity: 1,
+          };
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
-      payment_method_types: ['card', 'link'],
-      line_items: [
-        {
-          price_data: {
-            currency: data.currency.toLowerCase(),
-            product_data: {
-              name: `iExcelo - ${plan.name}`,
-              description:
-                plan.description || `${plan.durationDays} days access`,
-            },
-            unit_amount: Math.round(price.amount * 100), // Stripe uses cents
-            recurring: {
-              interval: 'day',
-              interval_count: plan.durationDays,
-            },
-          },
-          quantity: 1,
-        },
-      ],
+      payment_method_types: ['card'],
+      line_items: [lineItem],
       success_url: `${data.successUrl}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: data.cancelUrl,
       metadata: {
@@ -113,6 +118,8 @@ export class CheckoutService {
         examTypeId: data.examTypeId,
         planId: data.planId,
       },
+      // subscription_data.metadata is echoed on every invoice via
+      // invoice.subscription_details.metadata — critical for webhook matching.
       subscription_data: {
         metadata: {
           subscriptionId: subscription.id,
@@ -123,19 +130,17 @@ export class CheckoutService {
       },
     };
 
-    // Add customer email if provided
     if (data.customerEmail) {
       sessionParams.customer_email = data.customerEmail;
     }
 
     const session = await this.stripe.checkout.sessions.create(sessionParams);
 
-    // Update subscription with Stripe session ID
+    // Store session ID temporarily so the verify endpoint can retrieve it.
+    // It will be replaced with the real sub_xxx by verifyStripeSession / webhook.
     subscription.providerSubscriptionId = session.id;
     await this.subscriptionsService['subscriptionRepo'].save(subscription);
 
-    // Create PENDING transaction record for audit trail
-    // studentExamTypeId left undefined — it may not exist yet for first-time subscribers
     await this.transactionsService.create({
       studentId: data.studentId,
       subscriptionId: subscription.id,
@@ -148,7 +153,7 @@ export class CheckoutService {
 
     return {
       sessionId: session.id,
-      url: session.url!,
+      authorizationUrl: session.url!,
     };
   }
 

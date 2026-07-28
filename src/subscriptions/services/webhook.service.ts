@@ -281,15 +281,25 @@ export class WebhookService {
       planCode: string;
       customerCode: string;
       customerEmail: string;
+      /** Stripe: our DB subscription ID embedded in subscription_data.metadata */
+      directSubscriptionId?: string;
     },
   ): Promise<void> {
-    // Strategy 1: find by customer_code + plan (if charge.success already stored it)
-    let subscription =
-      await this.subscriptionsService.findRecentByProviderCustomer(
-        provider,
-        data.customerCode,
-        data.planCode,
-      );
+    let subscription = data.directSubscriptionId
+      ? await this.subscriptionsService.findSubscriptionById(
+          data.directSubscriptionId,
+        )
+      : null;
+
+    if (!subscription) {
+      // Strategy 1: find by customer_code + plan (if charge.success already stored it)
+      subscription =
+        await this.subscriptionsService.findRecentByProviderCustomer(
+          provider,
+          data.customerCode,
+          data.planCode,
+        );
+    }
 
     // Strategy 2: find by student email + plan (always works, joins through StudentProfile → User)
     if (!subscription && data.customerEmail) {
@@ -302,7 +312,6 @@ export class WebhookService {
     }
 
     if (subscription) {
-      // Store the Paystack subscription_code — needed for disable/not_renew events
       await this.subscriptionsService.updateProviderInfo(subscription.id, {
         providerSubscriptionId: data.subscriptionCode,
         providerCustomerId: data.customerCode,

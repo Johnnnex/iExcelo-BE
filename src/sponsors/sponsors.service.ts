@@ -14,6 +14,7 @@ import { Queue } from 'bullmq';
 import { EMAILS_QUEUE, EmailJobs } from '../email/queue/email.queue';
 import { ConfigService } from '@nestjs/config';
 import { Repository, Between } from 'typeorm';
+import Stripe from 'stripe';
 import { DAY_MS } from '../common/constants';
 import * as crypto from 'crypto';
 import { nanoid } from 'nanoid';
@@ -42,6 +43,8 @@ import {
 
 @Injectable()
 export class SponsorsService {
+  private stripe: Stripe | null = null;
+
   constructor(
     @InjectRepository(SponsorProfile)
     private sponsorProfileRepo: Repository<SponsorProfile>,
@@ -61,7 +64,10 @@ export class SponsorsService {
     private emailService: EmailService,
     @InjectQueue(EMAILS_QUEUE) private readonly emailQueue: Queue,
     private loggerService: LoggerService,
-  ) {}
+  ) {
+    const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    if (stripeKey) this.stripe = new Stripe(stripeKey);
+  }
 
   // ─── Profile ──────────────────────────────────────────────────────────────
 
@@ -648,10 +654,13 @@ export class SponsorsService {
       planPriceId: string;
       customerEmail: string;
       callbackUrl: string;
+      region?: string; // ISO country code — determines payment provider
     },
   ): Promise<{
     authorizationUrl: string;
-    reference: string;
+    reference?: string;
+    sessionId?: string;
+    provider: string;
     givebackId: string;
     eligibleCount: number;
     conflicts: Array<{ studentId: string; reason: string }>;
@@ -659,7 +668,19 @@ export class SponsorsService {
     const paystackSecretKey = this.configService.get<string>(
       'PAYSTACK_SECRET_KEY',
     );
-    if (!paystackSecretKey)
+
+    // Resolve provider from region (same logic as student subscription checkout)
+    const checkoutInfo = data.region
+      ? await this.subscriptionsService.getCheckoutInfo(
+          data.examTypeId,
+          data.region,
+        )
+      : null;
+    const useStripe =
+      checkoutInfo?.provider === PaymentProvider.STRIPE ||
+      (!data.region && !paystackSecretKey && !!this.stripe);
+
+    if (!useStripe && !paystackSecretKey)
       throw new BadRequestException('Paystack is not configured');
 
     const sponsorProfile = await this.findByUserId(sponsorUserId);
@@ -735,6 +756,10 @@ export class SponsorsService {
     });
     const savedGiveback = await this.givebackRepo.save(giveback);
 
+    const provider = useStripe
+      ? PaymentProvider.STRIPE
+      : PaymentProvider.PAYSTACK;
+
     // Create PENDING Subscription for each eligible student (parallel)
     await Promise.all(
       eligibleProfiles.map((profile) =>
@@ -745,20 +770,88 @@ export class SponsorsService {
           planPriceId: data.planPriceId,
           sponsorId: sponsorProfile.id,
           givebackId: savedGiveback.id,
-          provider: PaymentProvider.PAYSTACK,
+          provider,
           currency: planPrice.currency,
           amount: planPrice.amount,
         }),
       ),
     );
 
-    // Initialize Paystack one-time transaction (NO plan code = not recurring)
+    const givebackMeta = {
+      givebackId: savedGiveback.id,
+      sponsorId: sponsorProfile.id,
+      planId: data.planId,
+      examTypeId: data.examTypeId,
+      studentCount: eligibleCount,
+    };
+
+    // ── Stripe one-time payment session ──────────────────────────────────────
+    if (useStripe) {
+      if (!this.stripe) {
+        await this.subscriptionsService.cancelPendingGivebackSubscriptions(
+          savedGiveback.id,
+        );
+        await this.givebackRepo.delete({ id: savedGiveback.id });
+        throw new BadRequestException('Stripe is not configured');
+      }
+
+      let session: Stripe.Checkout.Session;
+      try {
+        session = await this.stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          customer_email: data.customerEmail,
+          line_items: [
+            {
+              price_data: {
+                currency: planPrice.currency.toLowerCase(),
+                product_data: {
+                  name: `iExcelo — ${plan.name} × ${eligibleCount} student(s)`,
+                  description: `Sponsor giveback: ${eligibleCount} student subscription(s)`,
+                },
+                unit_amount: Math.round(totalAmount * 100),
+              },
+              quantity: 1,
+            },
+          ],
+          success_url: `${data.callbackUrl}?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: data.callbackUrl,
+          metadata: givebackMeta,
+        });
+      } catch (err) {
+        await this.subscriptionsService.cancelPendingGivebackSubscriptions(
+          savedGiveback.id,
+        );
+        await this.givebackRepo.delete({ id: savedGiveback.id });
+        throw new BadRequestException(
+          `Stripe session creation failed: ${(err as Error).message}`,
+        );
+      }
+
+      await this.loggerService.log({
+        userId: sponsorUserId,
+        action: LogActionTypes.CREATE,
+        description: `Sponsor initiated Stripe giveback for ${eligibleCount} student(s)`,
+        metadata: { ...givebackMeta, sessionId: session.id },
+      });
+
+      return {
+        authorizationUrl: session.url!,
+        sessionId: session.id,
+        provider: 'stripe',
+        givebackId: savedGiveback.id,
+        eligibleCount,
+        conflicts,
+      };
+    }
+
+    // ── Paystack one-time transaction (NO plan code = not recurring) ──────────
     const response = await fetch(
       'https://api.paystack.co/transaction/initialize',
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${paystackSecretKey}`,
+          Authorization: `Bearer ${paystackSecretKey!}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -767,11 +860,7 @@ export class SponsorsService {
           currency: planPrice.currency,
           callback_url: data.callbackUrl,
           metadata: {
-            givebackId: savedGiveback.id,
-            sponsorId: sponsorProfile.id,
-            planId: data.planId,
-            examTypeId: data.examTypeId,
-            studentCount: eligibleCount,
+            ...givebackMeta,
             custom_fields: [
               {
                 display_name: 'Plan',
@@ -796,7 +885,6 @@ export class SponsorsService {
     };
 
     if (!result.status || !result.data) {
-      // Cleanup: delete the pending giveback and its subscriptions on Paystack failure
       await this.subscriptionsService.cancelPendingGivebackSubscriptions(
         savedGiveback.id,
       );
@@ -810,17 +898,13 @@ export class SponsorsService {
       userId: sponsorUserId,
       action: LogActionTypes.CREATE,
       description: `Sponsor initiated giveback for ${eligibleCount} student(s)`,
-      metadata: {
-        givebackId: savedGiveback.id,
-        sponsorId: sponsorProfile.id,
-        reference: result.data.reference,
-        studentCount: eligibleCount,
-      },
+      metadata: { ...givebackMeta, reference: result.data.reference },
     });
 
     return {
       authorizationUrl: result.data.authorization_url,
       reference: result.data.reference,
+      provider: 'paystack',
       givebackId: savedGiveback.id,
       eligibleCount,
       conflicts,
@@ -828,47 +912,64 @@ export class SponsorsService {
   }
 
   /**
-   * Verify a sponsor giveback payment by Paystack reference.
+   * Verify a sponsor giveback payment.
+   * Accepts either a Paystack reference or a Stripe session_id.
    * Activates all PENDING subscriptions linked to the giveback.
    */
   async verifySponsorGiveback(
     sponsorUserId: string,
-    reference: string,
+    params: { reference?: string; sessionId?: string },
   ): Promise<{
     success: boolean;
     givebackId?: string;
     activatedCount: number;
   }> {
-    const paystackSecretKey = this.configService.get<string>(
-      'PAYSTACK_SECRET_KEY',
-    );
-    if (!paystackSecretKey)
-      throw new BadRequestException('Paystack is not configured');
-
     const sponsorProfile = await this.findByUserId(sponsorUserId);
     if (!sponsorProfile)
       throw new NotFoundException('Sponsor profile not found');
 
-    // Verify with Paystack
-    const response = await fetch(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      { headers: { Authorization: `Bearer ${paystackSecretKey}` } },
-    );
+    let givebackId: string | undefined;
 
-    const result = (await response.json()) as {
-      status: boolean;
-      data?: {
-        status: string;
-        metadata?: { givebackId?: string; sponsorId?: string };
+    if (params.sessionId) {
+      // ── Stripe verify ──────────────────────────────────────────────────────
+      if (!this.stripe)
+        throw new BadRequestException('Stripe is not configured');
+      const session = await this.stripe.checkout.sessions.retrieve(
+        params.sessionId,
+      );
+      if (session.payment_status !== 'paid') {
+        return { success: false, activatedCount: 0 };
+      }
+      givebackId = session.metadata?.givebackId;
+    } else if (params.reference) {
+      // ── Paystack verify ────────────────────────────────────────────────────
+      const paystackSecretKey = this.configService.get<string>(
+        'PAYSTACK_SECRET_KEY',
+      );
+      if (!paystackSecretKey)
+        throw new BadRequestException('Paystack is not configured');
+
+      const response = await fetch(
+        `https://api.paystack.co/transaction/verify/${params.reference}`,
+        { headers: { Authorization: `Bearer ${paystackSecretKey}` } },
+      );
+      const result = (await response.json()) as {
+        status: boolean;
+        data?: {
+          status: string;
+          metadata?: { givebackId?: string };
+        };
       };
-      message?: string;
-    };
-
-    if (!result.status || result.data?.status !== 'success') {
-      return { success: false, activatedCount: 0 };
+      if (!result.status || result.data?.status !== 'success') {
+        return { success: false, activatedCount: 0 };
+      }
+      givebackId = result.data?.metadata?.givebackId;
+    } else {
+      throw new BadRequestException(
+        'Either reference or sessionId is required',
+      );
     }
 
-    const givebackId = result.data?.metadata?.givebackId;
     if (!givebackId) return { success: false, activatedCount: 0 };
 
     // Confirm the giveback belongs to this sponsor
@@ -904,8 +1005,8 @@ export class SponsorsService {
           type: TransactionType.SPONSORSHIP,
           amount: sub.amountPaid,
           currency: sub.currency,
-          provider: PaymentProvider.PAYSTACK,
-          providerTransactionId: reference,
+          provider: sub.paymentProvider,
+          providerTransactionId: params.reference || params.sessionId,
         });
       } catch {
         // Continue — don't fail the whole batch for one student
@@ -953,10 +1054,13 @@ export class SponsorsService {
       planPriceId: string;
       customerEmail: string;
       callbackUrl: string;
+      region?: string;
     },
   ): Promise<{
     authorizationUrl: string;
-    reference: string;
+    reference?: string;
+    sessionId?: string;
+    provider: string;
     newGivebackId: string;
     eligibleCount: number;
     conflicts: Array<{ studentId: string; reason: string }>;
@@ -964,7 +1068,18 @@ export class SponsorsService {
     const paystackSecretKey = this.configService.get<string>(
       'PAYSTACK_SECRET_KEY',
     );
-    if (!paystackSecretKey)
+
+    const checkoutInfo = data.region
+      ? await this.subscriptionsService.getCheckoutInfo(
+          data.examTypeId,
+          data.region,
+        )
+      : null;
+    const useStripe =
+      checkoutInfo?.provider === PaymentProvider.STRIPE ||
+      (!data.region && !paystackSecretKey && !!this.stripe);
+
+    if (!useStripe && !paystackSecretKey)
       throw new BadRequestException('Paystack is not configured');
 
     const sponsorProfile = await this.findByUserId(sponsorUserId);
@@ -1045,6 +1160,10 @@ export class SponsorsService {
     });
     const savedNewGiveback = await this.givebackRepo.save(newGiveback);
 
+    const provider = useStripe
+      ? PaymentProvider.STRIPE
+      : PaymentProvider.PAYSTACK;
+
     // Create PENDING subs for each eligible student.
     // Stacking (startDate = existing endDate + 1) is auto-detected in activateSubscription().
     await Promise.all(
@@ -1056,20 +1175,92 @@ export class SponsorsService {
           planPriceId: data.planPriceId,
           sponsorId: sponsorProfile.id,
           givebackId: savedNewGiveback.id,
-          provider: PaymentProvider.PAYSTACK,
+          provider,
           currency: planPrice.currency,
           amount: planPrice.amount,
         }),
       ),
     );
 
-    // Initialize Paystack transaction
+    const givebackMeta = {
+      givebackId: savedNewGiveback.id,
+      sponsorId: sponsorProfile.id,
+      planId: data.planId,
+      examTypeId: data.examTypeId,
+      studentCount: eligibleCount,
+      isResub: 1, // Stripe metadata only accepts string|number|null — 1 = true
+      originalGivebackId: data.originalGivebackId,
+    };
+
+    // ── Stripe one-time payment session ──────────────────────────────────────
+    if (useStripe) {
+      if (!this.stripe) {
+        await this.subscriptionsService.cancelPendingGivebackSubscriptions(
+          savedNewGiveback.id,
+        );
+        await this.givebackRepo.delete({ id: savedNewGiveback.id });
+        throw new BadRequestException('Stripe is not configured');
+      }
+
+      let session: Stripe.Checkout.Session;
+      try {
+        session = await this.stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          customer_email: data.customerEmail,
+          line_items: [
+            {
+              price_data: {
+                currency: planPrice.currency.toLowerCase(),
+                product_data: {
+                  name: `iExcelo — ${plan.name} × ${eligibleCount} student(s) (Resub)`,
+                  description: `Sponsor resub giveback: ${eligibleCount} student subscription(s)`,
+                },
+                unit_amount: Math.round(totalAmount * 100),
+              },
+              quantity: 1,
+            },
+          ],
+          success_url: `${data.callbackUrl}?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: data.callbackUrl,
+          metadata: givebackMeta,
+        });
+      } catch (err) {
+        await this.subscriptionsService.cancelPendingGivebackSubscriptions(
+          savedNewGiveback.id,
+        );
+        await this.givebackRepo.delete({ id: savedNewGiveback.id });
+        throw new BadRequestException(
+          `Stripe session creation failed: ${(err as Error).message}`,
+        );
+      }
+
+      await this.markGivebackResubbed(data.originalGivebackId);
+
+      await this.loggerService.log({
+        userId: sponsorUserId,
+        action: LogActionTypes.CREATE,
+        description: `Sponsor initiated Stripe resub giveback for ${eligibleCount} student(s)`,
+        metadata: { ...givebackMeta, sessionId: session.id },
+      });
+
+      return {
+        authorizationUrl: session.url!,
+        sessionId: session.id,
+        provider: 'stripe',
+        newGivebackId: savedNewGiveback.id,
+        eligibleCount,
+        conflicts,
+      };
+    }
+
+    // ── Paystack one-time transaction ─────────────────────────────────────────
     const response = await fetch(
       'https://api.paystack.co/transaction/initialize',
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${paystackSecretKey}`,
+          Authorization: `Bearer ${paystackSecretKey!}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -1077,15 +1268,7 @@ export class SponsorsService {
           amount: Math.round(totalAmount * 100),
           currency: planPrice.currency,
           callback_url: data.callbackUrl,
-          metadata: {
-            givebackId: savedNewGiveback.id,
-            sponsorId: sponsorProfile.id,
-            planId: data.planId,
-            examTypeId: data.examTypeId,
-            studentCount: eligibleCount,
-            isResub: true,
-            originalGivebackId: data.originalGivebackId,
-          },
+          metadata: givebackMeta,
         }),
       },
     );
@@ -1106,7 +1289,6 @@ export class SponsorsService {
       );
     }
 
-    // Mark original giveback as resubbed (prevents double-resubbing)
     await this.markGivebackResubbed(data.originalGivebackId);
 
     await this.loggerService.log({
@@ -1114,9 +1296,7 @@ export class SponsorsService {
       action: LogActionTypes.CREATE,
       description: `Sponsor initiated resub giveback for ${eligibleCount} student(s)`,
       metadata: {
-        originalGivebackId: data.originalGivebackId,
-        newGivebackId: savedNewGiveback.id,
-        sponsorId: sponsorProfile.id,
+        ...givebackMeta,
         reference: result.data.reference,
         eligibleCount,
       },
@@ -1125,6 +1305,7 @@ export class SponsorsService {
     return {
       authorizationUrl: result.data.authorization_url,
       reference: result.data.reference,
+      provider: 'paystack',
       newGivebackId: savedNewGiveback.id,
       eligibleCount,
       conflicts,

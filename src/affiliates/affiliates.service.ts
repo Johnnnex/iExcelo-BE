@@ -453,7 +453,10 @@ export class AffiliatesService {
           return {
             ...referral,
             referredUser: referral.referredUser
-              ? { ...referral.referredUser, email: redactEmail(referral.referredUser.email) }
+              ? {
+                  ...referral.referredUser,
+                  email: redactEmail(referral.referredUser.email),
+                }
               : referral.referredUser,
             totalRevenueGenerated: parseFloat(commissionSum?.revenue || '0'),
             totalCommissionGenerated: parseFloat(
@@ -477,7 +480,10 @@ export class AffiliatesService {
         return {
           ...referral,
           referredUser: referral.referredUser
-            ? { ...referral.referredUser, email: redactEmail(referral.referredUser.email) }
+            ? {
+                ...referral.referredUser,
+                email: redactEmail(referral.referredUser.email),
+              }
             : referral.referredUser,
           totalCommissionGenerated: parseFloat(
             commissionSum?.commission || '0',
