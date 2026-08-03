@@ -82,6 +82,11 @@ export class WebhooksController {
     }
 
     try {
+      // DEV: log every incoming Stripe event so we can inspect actual payload shapes
+      this.logger.debug(
+        `[Stripe] ${event.type}\n${JSON.stringify(event.data.object, null, 2)}`,
+      );
+
       // Process based on event type
       switch (event.type) {
         case 'payment_intent.succeeded':
