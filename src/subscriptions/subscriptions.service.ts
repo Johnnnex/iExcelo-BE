@@ -691,6 +691,17 @@ export class SubscriptionsService {
   }
 
   /**
+   * Re-enable a CANCELLED subscription (customer un-cancelled via portal).
+   * Restores status to ACTIVE and turns auto-renew back on.
+   */
+  async reactivateSubscription(subscriptionId: string): Promise<void> {
+    await this.subscriptionRepo.update(subscriptionId, {
+      status: SubscriptionStatus.ACTIVE,
+      autoRenew: true,
+    });
+  }
+
+  /**
    * Cancel subscription (user initiated)
    */
   async cancelSubscription(

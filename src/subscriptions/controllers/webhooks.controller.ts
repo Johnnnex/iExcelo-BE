@@ -208,6 +208,31 @@ export class WebhooksController {
           break;
         }
 
+        case 'customer.subscription.updated': {
+          const stripeSub = event.data.object;
+          if (stripeSub.cancel_at_period_end === true) {
+            // Portal "cancel at period end" — mirror Paystack: mark CANCELLED now so the
+            // UI shows it immediately; access continues until endDate. When the period
+            // actually ends Stripe fires customer.subscription.deleted, which we handle
+            // idempotently (already CANCELLED → no-op).
+            await this.webhookService.handleSubscriptionCancelled(
+              PaymentProvider.STRIPE,
+              stripeSub.id,
+            );
+          } else if (
+            stripeSub.status === 'active' &&
+            stripeSub.cancel_at_period_end === false
+          ) {
+            // Customer re-enabled their subscription via the portal (un-cancelled).
+            await this.webhookService.handleSubscriptionReactivated(
+              PaymentProvider.STRIPE,
+              stripeSub.id,
+            );
+          }
+          // Other status changes (past_due, unpaid) are driven by invoice.payment_failed.
+          break;
+        }
+
         case 'customer.subscription.deleted':
           await this.webhookService.handleSubscriptionCancelled(
             PaymentProvider.STRIPE,

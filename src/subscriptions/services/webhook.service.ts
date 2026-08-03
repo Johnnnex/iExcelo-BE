@@ -493,6 +493,32 @@ export class WebhookService {
   }
 
   /**
+   * Process customer.subscription.updated with cancel_at_period_end=false (re-enabled via portal).
+   */
+  async handleSubscriptionReactivated(
+    provider: PaymentProvider,
+    providerSubscriptionId: string,
+  ): Promise<void> {
+    const subscription =
+      await this.subscriptionsService.findByProviderSubscriptionId(
+        providerSubscriptionId,
+      );
+
+    if (subscription && subscription.status === SubscriptionStatus.CANCELLED) {
+      await this.subscriptionsService.reactivateSubscription(subscription.id);
+      this.logger.log(
+        `Subscription ${subscription.id} re-enabled via provider webhook`,
+      );
+    }
+
+    await this.loggerService.log({
+      action: LogActionTypes.UPDATE,
+      description: 'Subscription reactivation webhook received',
+      metadata: { provider, providerSubscriptionId },
+    });
+  }
+
+  /**
    * Process subscription cancelled/disabled/not_renew event.
    *
    * Cancelled = truly cancelled. Deactivate immediately regardless of endDate.

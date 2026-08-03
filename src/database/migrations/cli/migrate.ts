@@ -37,6 +37,8 @@ import { SponsorStudentInvite } from '../../../sponsors/entities/sponsor-student
 import { Giveback } from '../../../sponsors/entities/giveback.entity';
 import { AffiliateProfile } from '../../../affiliates/entities/affiliate-profile.entity';
 import { AffiliateReferral } from '../../../affiliates/entities/affiliate-referral.entity';
+import { AffiliatePayoutAccount } from '../../../affiliates/entities/affiliate-payout-account.entity';
+import { AffiliatePayout } from '../../../affiliates/entities/affiliate-payout.entity';
 import { Commission } from '../../../affiliates/entities/commission.entity';
 import { ExamAttempt } from '../../../students/entities/exam-attempt.entity';
 import { StudentExamType } from '../../../students/entities/student-exam-type.entity';
@@ -94,6 +96,8 @@ async function createDataSource(): Promise<DataSource> {
       SponsorStudentInvite,
       AffiliateProfile,
       AffiliateReferral,
+      AffiliatePayoutAccount,
+      AffiliatePayout,
       Commission,
       ExamAttempt,
       StudentExamType,
