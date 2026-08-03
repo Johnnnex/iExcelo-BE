@@ -493,6 +493,26 @@ export class WebhookService {
   }
 
   /**
+   * Process checkout.session.completed — retrieve card details from the newly
+   * created Stripe subscription and persist them on our internal subscription.
+   * This is the only reliable place to capture card info: the invoice payload
+   * does not expand payment_intent/charge objects, so payment_method_details
+   * is never available there without an extra API call.
+   */
+  async handleCheckoutCompleted(
+    subscriptionId: string,
+    stripeSubscriptionId: string,
+  ): Promise<void> {
+    await this.subscriptionsService.saveStripeCardInfoFromSubscription(
+      subscriptionId,
+      stripeSubscriptionId,
+    );
+    this.logger.log(
+      `Card info saved for subscription ${subscriptionId} from checkout`,
+    );
+  }
+
+  /**
    * Process customer.subscription.updated with cancel_at_period_end=false (re-enabled via portal).
    */
   async handleSubscriptionReactivated(

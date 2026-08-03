@@ -176,6 +176,7 @@ export class EmailsProcessor extends WorkerHost {
         firstName,
         subject,
         htmlContent,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         category as any,
       );
     } catch (err: unknown) {

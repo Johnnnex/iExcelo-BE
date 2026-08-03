@@ -72,6 +72,7 @@ export class UsersService {
     );
 
     if (Object.keys(updates).length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await this.userRepo.update(id, updates as any);
     }
 

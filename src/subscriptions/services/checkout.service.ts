@@ -327,6 +327,12 @@ export class CheckoutService {
         subscription.providerCustomerId = session.customer as string;
         await this.subscriptionsService['subscriptionRepo'].save(subscription);
 
+        // Persist card details (idempotent with checkout.session.completed webhook)
+        await this.subscriptionsService.saveStripeCardInfoFromSubscription(
+          subscriptionId,
+          stripeSubscription.id,
+        );
+
         // Activate the subscription
         await this.subscriptionsService.activateSubscription(subscriptionId);
       }

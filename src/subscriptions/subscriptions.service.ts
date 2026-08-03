@@ -1521,6 +1521,28 @@ export class SubscriptionsService {
     return null;
   }
 
+  /**
+   * Retrieve card details from Stripe for a given Stripe subscription ID and
+   * persist them on our internal subscription record.
+   * Called from checkout.session.completed webhook and verify endpoint.
+   */
+  async saveStripeCardInfoFromSubscription(
+    ourSubscriptionId: string,
+    stripeSubscriptionId: string,
+  ): Promise<void> {
+    const cardInfo = await this.fetchStripeCardInfo(stripeSubscriptionId);
+    if (cardInfo) {
+      await this.updateCardInfo(ourSubscriptionId, {
+        cardBrand: cardInfo.brand,
+        cardLast4: cardInfo.last4,
+        cardExpMonth: cardInfo.expMonth,
+        cardExpYear: cardInfo.expYear,
+        cardBank: null,
+        cardChannel: 'card',
+      });
+    }
+  }
+
   private async fetchStripeCardInfo(subscriptionId: string): Promise<{
     brand: string;
     last4: string;

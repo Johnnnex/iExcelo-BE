@@ -85,17 +85,38 @@ export class WebhooksController {
       // Process based on event type
       switch (event.type) {
         case 'payment_intent.succeeded':
-        case 'checkout.session.completed':
+        case 'payment_intent.created':
         case 'customer.created':
+        case 'customer.updated':
         case 'payment_method.attached':
         case 'invoice.created':
         case 'invoice.finalized':
         case 'charge.succeeded':
         case 'invoice_payment.paid':
-          // Informational events fired as side effects of the checkout flow.
-          // invoice_payment.paid is a newer alias; invoice.paid fires alongside it
-          // and handles activation. Acknowledge these to suppress WARN logs.
+        case 'billing_portal.session.created':
+          // Informational events fired as side effects of the checkout / portal flow.
+          // invoice_payment.paid is a newer alias; invoice.paid fires alongside it.
+          // Acknowledge these to suppress WARN logs.
           break;
+
+        case 'checkout.session.completed': {
+          // Extract card details from the completed Stripe subscription and store
+          // them on our internal subscription record. This is the only reliable
+          // webhook to capture card info — invoice payloads don't expand
+          // payment_intent/charge, so payment_method_details is unavailable there.
+          const session = event.data.object;
+          const subscriptionId = session.metadata?.subscriptionId as
+            | string
+            | undefined;
+          const stripeSubscriptionId = session.subscription as string | null;
+          if (subscriptionId && stripeSubscriptionId) {
+            await this.webhookService.handleCheckoutCompleted(
+              subscriptionId,
+              stripeSubscriptionId,
+            );
+          }
+          break;
+        }
 
         case 'invoice.paid':
         case 'invoice.payment_succeeded': {
