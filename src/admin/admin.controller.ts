@@ -789,7 +789,6 @@ export class AdminSubscriptionsController {
       regionCode: string;
       regionName: string;
       currency: string;
-      paymentProvider: string;
       isActive?: boolean;
     },
   ) {
@@ -804,11 +803,42 @@ export class AdminSubscriptionsController {
     body: {
       regionName?: string;
       currency?: string;
-      paymentProvider?: string;
       isActive?: boolean;
     },
   ) {
     return this.subscriptionsService.updateRegionCurrency(id, body);
+  }
+
+  // ─── Plan Price Providers ───────────────────────────────────────────────────
+
+  @Get('plan-prices/:planPriceId/providers')
+  @AdminAccess(AdminModule.SUBSCRIPTIONS, 'read')
+  listPlanPriceProviders(@Param('planPriceId') planPriceId: string) {
+    return this.subscriptionsService.listPlanPriceProviders(planPriceId);
+  }
+
+  @Post('plan-prices/:planPriceId/providers')
+  @AdminAccess(AdminModule.SUBSCRIPTIONS, 'write')
+  upsertPlanPriceProvider(
+    @Param('planPriceId') planPriceId: string,
+    @Body()
+    body: {
+      provider: string;
+      stripePriceId?: string | null;
+      paystackPlanCode?: string | null;
+      isActive?: boolean;
+    },
+  ) {
+    return this.subscriptionsService.upsertPlanPriceProvider({
+      planPriceId,
+      ...body,
+    });
+  }
+
+  @Delete('plan-prices/providers/:id')
+  @AdminAccess(AdminModule.SUBSCRIPTIONS, 'write')
+  deletePlanPriceProvider(@Param('id') id: string) {
+    return this.subscriptionsService.deletePlanPriceProvider(id);
   }
 }
 

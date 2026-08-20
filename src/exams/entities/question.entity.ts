@@ -64,6 +64,18 @@ export class Question extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   explanation: string | null;
 
+  // Storage format for questionText and explanation.
+  // 'markdown' = tiptap-markdown string (legacy)
+  // 'plate'    = JSON.stringify(Plate Slate nodes)
+  @Column({ type: 'varchar', length: 20, default: 'markdown' })
+  contentFormat: 'markdown' | 'plate';
+
+  // Plate.js discussion/comment thread metadata.
+  // Stores the TDiscussion[] from discussionPlugin.options.discussions.
+  // Comment marks (highlighting) live in questionText JSON; this stores the message content.
+  @Column({ type: 'json', nullable: true })
+  discussions: unknown[] | null;
+
   // Per-type validation config
   @Column({ type: 'json', nullable: true })
   validationConfig: {

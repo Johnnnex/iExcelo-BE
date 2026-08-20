@@ -12,6 +12,7 @@ import {
   SendWelcomeEmailJobData,
   SendSponsoredActivationEmailJobData,
   SendBulkCampaignEmailJobData,
+  SendStripeReceiptEmailJobData,
 } from './email.queue';
 
 @Processor(EMAILS_QUEUE)
@@ -53,6 +54,11 @@ export class EmailsProcessor extends WorkerHost {
       case EmailJobs.SEND_BULK_CAMPAIGN:
         await this.handleSendBulkCampaign(
           job as Job<SendBulkCampaignEmailJobData>,
+        );
+        break;
+      case EmailJobs.SEND_STRIPE_RECEIPT:
+        await this.handleSendStripeReceipt(
+          job as Job<SendStripeReceiptEmailJobData>,
         );
         break;
       default:
@@ -182,6 +188,29 @@ export class EmailsProcessor extends WorkerHost {
     } catch (err: unknown) {
       this.logger.error(
         `Bulk campaign email failed for ${email}: ${(err as Error)?.message}`,
+      );
+      throw err;
+    }
+  }
+
+  private async handleSendStripeReceipt(
+    job: Job<SendStripeReceiptEmailJobData>,
+  ): Promise<void> {
+    const { email, firstName, amount, currency, cardBrand, cardLast4, receiptUrl } = job.data;
+    this.logger.log(`Sending Stripe receipt email to ${email}`);
+    try {
+      await this.emailService.sendStripeReceiptEmail({
+        email,
+        firstName,
+        amount,
+        currency,
+        cardBrand,
+        cardLast4,
+        receiptUrl,
+      });
+    } catch (err: unknown) {
+      this.logger.error(
+        `Stripe receipt email failed for ${email}: ${(err as Error)?.message}`,
       );
       throw err;
     }

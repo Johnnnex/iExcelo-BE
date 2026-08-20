@@ -43,6 +43,7 @@ import { AffiliatePayoutAccount } from '../affiliates/entities/affiliate-payout-
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { SubscriptionPlan } from '../subscriptions/entities/subscription-plan.entity';
 import { PlanPrice } from '../subscriptions/entities/plan-price.entity';
+import { PlanPriceProvider } from '../subscriptions/entities/plan-price-provider.entity';
 import { RegionCurrency } from '../subscriptions/entities/region-currency.entity';
 import { ExamType } from '../exams/entities/exam-type.entity';
 import { Subject } from '../exams/entities/subject.entity';
@@ -78,6 +79,7 @@ import { EMAILS_QUEUE } from '../email/queue/email.queue';
       Subscription,
       SubscriptionPlan,
       PlanPrice,
+      PlanPriceProvider,
       RegionCurrency,
       ExamType,
       Subject,

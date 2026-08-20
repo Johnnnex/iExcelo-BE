@@ -78,6 +78,12 @@ export enum Currency {
   AUD = 'AUD',
   GHS = 'GHS', // Ghanaian Cedi — Paystack
   GMD = 'GMD', // Gambian Dalasi — Stripe
+  ZAR = 'ZAR', // South African Rand — Paystack
+  KES = 'KES', // Kenyan Shilling — Paystack
+  UGX = 'UGX', // Ugandan Shilling — Stripe
+  TZS = 'TZS', // Tanzanian Shilling — Stripe
+  XOF = 'XOF', // West African CFA franc (Benin, Ivory Coast, etc.) — Stripe
+  XAF = 'XAF', // Central African CFA franc (Cameroon, etc.) — Stripe
 }
 
 // Legacy alias for backwards compatibility - will be removed

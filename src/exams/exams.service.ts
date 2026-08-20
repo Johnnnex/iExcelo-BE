@@ -986,6 +986,7 @@ export class ExamsService {
     return questions.map((q) => ({
       id: q.id,
       questionText: q.questionText,
+      contentFormat: q.contentFormat,
       type: q.type,
       marks: q.marks,
       difficulty: q.difficulty,

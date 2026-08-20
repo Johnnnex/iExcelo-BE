@@ -1,6 +1,14 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { BaseEntity } from '../../common/entities';
 import { SubscriptionPlan } from './subscription-plan.entity';
+import { PlanPriceProvider } from './plan-price-provider.entity';
 import { Currency } from '../../../types';
 
 @Entity('plan_prices')
@@ -22,16 +30,14 @@ export class PlanPrice extends BaseEntity {
   @Column({ default: true })
   isActive: boolean;
 
-  // Provider-specific price IDs for recurring subscriptions
-  @Column({ nullable: true })
-  stripePriceId: string; // Stripe price ID for recurring (e.g., 'price_xxx')
-
-  @Column({ nullable: true })
-  paystackPlanCode: string; // Paystack plan code for recurring
-
   @ManyToOne(() => SubscriptionPlan, (plan) => plan.prices, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'planId' })
   plan: SubscriptionPlan;
+
+  @OneToMany(() => PlanPriceProvider, (ppp) => ppp.planPrice, {
+    cascade: true,
+  })
+  providers: PlanPriceProvider[];
 }

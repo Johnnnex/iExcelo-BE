@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { ANALYTICS_QUEUE } from '../analytics/queue/analytics.queue';
+import { EMAILS_QUEUE } from '../email/queue/email.queue';
 
 // Entities
 import {
@@ -12,6 +13,7 @@ import {
   WebhookEvent,
   RegionCurrency,
   PlanPrice,
+  PlanPriceProvider,
 } from './entities';
 
 // Services
@@ -42,9 +44,11 @@ import { StudentsModule } from '../students/students.module';
       WebhookEvent,
       RegionCurrency,
       PlanPrice,
+      PlanPriceProvider,
     ]),
     ConfigModule,
     BullModule.registerQueue({ name: ANALYTICS_QUEUE }),
+    BullModule.registerQueue({ name: EMAILS_QUEUE }),
     LoggerModule,
     AnalyticsModule,
     AffiliatesModule,

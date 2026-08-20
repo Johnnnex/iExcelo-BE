@@ -25,6 +25,7 @@ import { Passage } from '../../../exams/entities/passage.entity';
 import { RegionCurrency } from '../../../subscriptions/entities/region-currency.entity';
 import { SubscriptionPlan } from '../../../subscriptions/entities/subscription-plan.entity';
 import { PlanPrice } from '../../../subscriptions/entities/plan-price.entity';
+import { PlanPriceProvider } from '../../../subscriptions/entities/plan-price-provider.entity';
 import { Subscription, Transaction } from '../../../subscriptions/entities';
 import { StudentProfile } from '../../../students/entities/student-profile.entity';
 import { User } from '../../../users/entities/user.entity';
@@ -56,6 +57,7 @@ import { migration003 } from '../scripts/003-seed-subscription-plans';
 import { migration004 } from '../scripts/004-import-questions';
 import { migration005 } from '../scripts/005-seed-superadmin';
 import { migration006 } from '../scripts/006-seed-role-templates';
+import { migration007 } from '../scripts/007-multi-provider-plan-prices';
 
 const ALL_MIGRATIONS = [
   migration001,
@@ -64,6 +66,7 @@ const ALL_MIGRATIONS = [
   migration004,
   migration005,
   migration006,
+  migration007,
 ];
 
 async function createDataSource(): Promise<DataSource> {
@@ -105,6 +108,7 @@ async function createDataSource(): Promise<DataSource> {
       Transaction,
       SponsorUrl,
       PlanPrice,
+      PlanPriceProvider,
       AdminProfile,
       AdminRole,
       AdminInvite,

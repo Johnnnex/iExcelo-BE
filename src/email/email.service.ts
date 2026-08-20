@@ -13,6 +13,7 @@ import { getAdminInviteEmailTemplate } from './templates/admin-invite.template';
 import { getWelcomeEmailTemplate } from './templates/welcome-email.template';
 import { getBulkCampaignEmailTemplate } from './templates/bulk-campaign.template';
 import { getSetPasswordEmailTemplate } from './templates/set-password.template';
+import { getStripeReceiptEmailTemplate } from './templates/stripe-receipt.template';
 
 @Injectable()
 export class EmailService {
@@ -176,6 +177,20 @@ export class EmailService {
       subject,
       html,
     });
+  }
+
+  async sendStripeReceiptEmail(params: {
+    email: string;
+    firstName: string;
+    amount: number;
+    currency: string;
+    cardBrand: string;
+    cardLast4: string;
+    receiptUrl: string;
+  }) {
+    const { email, ...rest } = params;
+    const { subject, html } = getStripeReceiptEmailTemplate(rest);
+    await this.transporter.sendMail({ from: this.from, to: email, subject, html });
   }
 
   async sendBulkCampaignEmail(

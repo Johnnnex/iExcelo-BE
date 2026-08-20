@@ -20,6 +20,7 @@ import {
   SubscriptionPlan,
   Transaction,
   PlanPrice,
+  PlanPriceProvider,
   RegionCurrency,
 } from './entities';
 import { User } from '../users/entities/user.entity';
@@ -53,6 +54,8 @@ export class SubscriptionsService {
     private transactionRepo: Repository<Transaction>,
     @InjectRepository(PlanPrice)
     private planPriceRepo: Repository<PlanPrice>,
+    @InjectRepository(PlanPriceProvider)
+    private planPriceProviderRepo: Repository<PlanPriceProvider>,
     @InjectRepository(RegionCurrency)
     private regionCurrencyRepo: Repository<RegionCurrency>,
     private configService: ConfigService,
@@ -113,20 +116,27 @@ export class SubscriptionsService {
         for (const currency of currencies) {
           const priceData = planPricesData[currency][priceIndex];
 
-          // Get exam-type-specific Paystack plan code for this currency + plan index
-          const paystackCode =
-            examPlanCodes[currency]?.[priceIndex] || undefined;
-
-          const price = this.planPriceRepo.create({
-            planId: savedPlan.id,
-            currency,
-            amount: priceData.amount,
-            isActive: true,
-            stripePriceId: priceData.stripePriceId,
-            paystackPlanCode: paystackCode || priceData.paystackPlanCode,
-          });
-          await this.planPriceRepo.save(price);
+          const price = await this.planPriceRepo.save(
+            this.planPriceRepo.create({
+              planId: savedPlan.id,
+              currency,
+              amount: priceData.amount,
+              isActive: true,
+            }),
+          );
           pricesCreated++;
+
+          const paystackCode = examPlanCodes[currency]?.[priceIndex];
+          if (paystackCode) {
+            await this.planPriceProviderRepo.save(
+              this.planPriceProviderRepo.create({
+                planPriceId: price.id,
+                provider: PaymentProvider.PAYSTACK,
+                paystackPlanCode: paystackCode,
+                isActive: true,
+              }),
+            );
+          }
         }
       }
     }
@@ -172,6 +182,81 @@ export class SubscriptionsService {
     });
 
     return this.subscriptionRepo.save(subscription);
+  }
+
+  /**
+   * Store the Stripe checkout session ID as a temporary providerSubscriptionId
+   * so the verify endpoint can look it up before the real sub_xxx arrives.
+   */
+  async setProviderSessionId(
+    subscriptionId: string,
+    sessionId: string,
+  ): Promise<void> {
+    await this.subscriptionRepo.update(
+      { id: subscriptionId },
+      { providerSubscriptionId: sessionId },
+    );
+  }
+
+  /**
+   * Replace the temporary session ID with the real Stripe subscription/customer IDs.
+   * Called by both the verify endpoint and the checkout.session.completed webhook.
+   * Returns false if the subscription doesn't exist.
+   */
+  async updateSubscriptionAfterStripeCheckout(
+    subscriptionId: string,
+    providerSubscriptionId: string,
+    providerCustomerId: string,
+  ): Promise<boolean> {
+    const subscription = await this.subscriptionRepo.findOne({
+      where: { id: subscriptionId },
+    });
+    if (!subscription) return false;
+    subscription.providerSubscriptionId = providerSubscriptionId;
+    subscription.providerCustomerId = providerCustomerId;
+    await this.subscriptionRepo.save(subscription);
+    return true;
+  }
+
+  /**
+   * Activate all PENDING subscriptions linked to a sponsor giveback.
+   * Used as a webhook safety net in case the sponsor's browser never called verify.
+   * Returns the number of subscriptions successfully activated.
+   */
+  async activateGivebackSubscriptions(givebackId: string): Promise<number> {
+    const givebackRepo =
+      this.subscriptionRepo.manager.getRepository(Giveback);
+    const giveback = await givebackRepo.findOne({ where: { id: givebackId } });
+    if (!giveback) return 0;
+
+    // Idempotency — already active
+    if (giveback.status === GivebackStatus.ACTIVE) {
+      const existing = await this.findSubscriptionsByGivebackId(givebackId);
+      return existing.length;
+    }
+
+    const subscriptions = await this.findSubscriptionsByGivebackId(givebackId);
+    let count = 0;
+    for (const sub of subscriptions) {
+      try {
+        await this.activateSubscription(sub.id);
+        count++;
+      } catch {
+        // Don't fail the whole batch for one student
+      }
+    }
+
+    const firstActivated =
+      await this.findFirstActivatedSubForGiveback(givebackId);
+    await givebackRepo.update(
+      { id: givebackId },
+      {
+        status: GivebackStatus.ACTIVE,
+        ...(firstActivated?.endDate ? { endDate: firstActivated.endDate } : {}),
+      },
+    );
+
+    return count;
   }
 
   /**
@@ -1036,14 +1121,15 @@ export class SubscriptionsService {
     providerCustomerId: string,
     planCode: string,
   ): Promise<Subscription | null> {
-    // Find plan prices that match this Paystack plan code
-    const matchingPrices = await this.planPriceRepo.find({
+    // Find plan prices that match this Paystack plan code via PlanPriceProvider
+    const matchingProviders = await this.planPriceProviderRepo.find({
       where: { paystackPlanCode: planCode, isActive: true },
+      relations: ['planPrice'],
     });
 
-    if (matchingPrices.length === 0) return null;
+    if (matchingProviders.length === 0) return null;
 
-    const planIds = [...new Set(matchingPrices.map((p) => p.planId))];
+    const planIds = [...new Set(matchingProviders.map((p) => p.planPrice.planId))];
 
     // Search ACTIVE first, then PENDING (charge.success may not have activated yet)
     const statusPriority = [
@@ -1084,12 +1170,13 @@ export class SubscriptionsService {
     email: string,
     planCode: string,
   ): Promise<Subscription | null> {
-    // Resolve planCode (PLN_xxx) → planIds
-    const matchingPrices = await this.planPriceRepo.find({
+    // Resolve planCode (PLN_xxx) → planIds via PlanPriceProvider
+    const matchingProviders = await this.planPriceProviderRepo.find({
       where: { paystackPlanCode: planCode, isActive: true },
+      relations: ['planPrice'],
     });
-    if (matchingPrices.length === 0) return null;
-    const planIds = [...new Set(matchingPrices.map((p) => p.planId))];
+    if (matchingProviders.length === 0) return null;
+    const planIds = [...new Set(matchingProviders.map((p) => p.planPrice.planId))];
 
     // Join through StudentProfile → User, filter by email + plan + provider
     return this.subscriptionRepo
@@ -1236,49 +1323,49 @@ export class SubscriptionsService {
   }
 
   /**
-   * Get checkout info for a region (currency, provider, prices)
+   * Get checkout info for a region (currency, per-plan providers)
    */
   async getCheckoutInfo(
     examTypeId: string,
     regionCode: string,
   ): Promise<{
     currency: Currency;
-    provider: PaymentProvider;
     plans: Array<{
       id: string;
       name: string;
       description: string;
       durationDays: number;
       price: number;
-      stripePriceId?: string;
-      paystackPlanCode?: string;
+      planPriceId?: string;
+      providers: Array<{ provider: PaymentProvider }>;
     }>;
   }> {
     // Get region currency mapping
-    let regionCurrency = await this.regionCurrencyRepo.findOne({
+    let currency = Currency.USD;
+    const regionCurrency = await this.regionCurrencyRepo.findOne({
       where: { regionCode, isActive: true },
     });
-
-    // Default to USD/Stripe if region not found
-    if (!regionCurrency) {
-      regionCurrency = {
-        currency: Currency.USD,
-        paymentProvider: PaymentProvider.STRIPE,
-      } as RegionCurrency;
+    if (regionCurrency) {
+      currency = regionCurrency.currency;
     }
 
-    // Get active plans for this exam type
+    // Get active plans for this exam type with prices and their providers
     const plans = await this.planRepo.find({
       where: { examTypeId, isActive: true },
-      relations: ['prices'],
+      relations: ['prices', 'prices.providers'],
       order: { sortOrder: 'ASC' },
     });
 
     // Map plans with prices in the detected currency
     const plansWithPrices = plans.map((plan) => {
       const priceRecord = plan.prices?.find(
-        (p) => p.currency === regionCurrency.currency && p.isActive,
+        (p) => p.currency === currency && p.isActive,
       );
+
+      const providers =
+        priceRecord?.providers
+          ?.filter((pp) => pp.isActive)
+          .map((pp) => ({ provider: pp.provider })) ?? [];
 
       return {
         id: plan.id,
@@ -1287,14 +1374,12 @@ export class SubscriptionsService {
         durationDays: plan.durationDays,
         price: priceRecord?.amount || 0,
         planPriceId: priceRecord?.id,
-        stripePriceId: priceRecord?.stripePriceId,
-        paystackPlanCode: priceRecord?.paystackPlanCode,
+        providers,
       };
     });
 
     return {
-      currency: regionCurrency.currency,
-      provider: regionCurrency.paymentProvider,
+      currency,
       plans: plansWithPrices,
     };
   }
@@ -1410,15 +1495,14 @@ export class SubscriptionsService {
   ): Promise<{
     region: string;
     currency: Currency;
-    provider: PaymentProvider;
     plans: Array<{
       id: string;
       name: string;
       description: string;
       durationDays: number;
       price: number;
-      stripePriceId?: string;
-      paystackPlanCode?: string;
+      planPriceId?: string;
+      providers: Array<{ provider: PaymentProvider }>;
     }>;
   }> {
     const region = await this.getRegionFromIp(ipAddress);
@@ -1537,7 +1621,6 @@ export class SubscriptionsService {
         cardLast4: cardInfo.last4,
         cardExpMonth: cardInfo.expMonth,
         cardExpYear: cardInfo.expYear,
-        cardBank: null,
         cardChannel: 'card',
       });
     }
@@ -1633,6 +1716,16 @@ export class SubscriptionsService {
   async findPlanPriceById(planPriceId: string): Promise<PlanPrice | null> {
     return this.planPriceRepo.findOne({
       where: { id: planPriceId, isActive: true },
+    });
+  }
+
+  /** Find an active PlanPriceProvider for a given price + provider combination. */
+  async findPlanPriceProvider(
+    planPriceId: string,
+    provider: PaymentProvider,
+  ): Promise<PlanPriceProvider | null> {
+    return this.planPriceProviderRepo.findOne({
+      where: { planPriceId, provider, isActive: true },
     });
   }
 
@@ -1912,12 +2005,19 @@ export class SubscriptionsService {
   async getStripeManageLink(
     customerId: string,
     returnUrl: string,
+    providerSubscriptionId?: string,
   ): Promise<string | null> {
     if (!this.stripe || !customerId) return null;
     try {
       const session = await this.stripe.billingPortal.sessions.create({
         customer: customerId,
         return_url: returnUrl,
+        ...(providerSubscriptionId && {
+          flow_data: {
+            type: 'subscription_update',
+            subscription_update: { subscription: providerSubscriptionId },
+          },
+        }),
       });
       return session.url;
     } catch (err) {

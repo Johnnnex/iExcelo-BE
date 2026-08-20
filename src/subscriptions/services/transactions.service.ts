@@ -66,6 +66,22 @@ export class TransactionsService {
   }
 
   /**
+   * Find the most recent PENDING transaction for a subscription.
+   * Used to avoid creating a duplicate succeeded transaction when the webhook
+   * provider transaction ID (e.g. Stripe invoice ID in_xxx) differs from the
+   * one stored at checkout (e.g. Stripe session ID cs_xxx).
+   */
+  async findPendingBySubscriptionId(
+    subscriptionId: string,
+  ): Promise<Transaction | null> {
+    return this.transactionRepo.findOne({
+      where: { subscriptionId, status: PaymentStatus.PENDING },
+      order: { createdAt: 'DESC' },
+      relations: ['subscription', 'student'],
+    });
+  }
+
+  /**
    * Find most recent transaction by provider customer ID
    */
   async findByProviderCustomerId(

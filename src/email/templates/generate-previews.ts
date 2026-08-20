@@ -14,6 +14,7 @@ import { getNewMessagesEmailTemplate } from './new-messages.template';
 import { getAdminInviteEmailTemplate } from './admin-invite.template';
 import { getWelcomeEmailTemplate } from './welcome-email.template';
 import { getBulkCampaignEmailTemplate } from './bulk-campaign.template';
+import { getStripeReceiptEmailTemplate } from './stripe-receipt.template';
 import { CampaignCategory } from '../../admin/entities/bulk-email-campaign.entity';
 
 const OUT_DIR = path.join(__dirname, '..', '..', '..', 'html');
@@ -179,6 +180,19 @@ function write(filename: string, html: string) {
     `,
   });
   write('08b-bulk-security-alert.html', html);
+})();
+
+// 9. Stripe payment receipt
+(() => {
+  const { html } = getStripeReceiptEmailTemplate({
+    firstName: 'Ekundayo',
+    amount: 500,
+    currency: 'eur',
+    cardBrand: 'mastercard',
+    cardLast4: '5454',
+    receiptUrl: 'https://pay.stripe.com/receipts/acct_example/ch_example/rcpt_example',
+  });
+  write('09-stripe-receipt.html', html);
 })();
 
 console.log('\nAll preview files written to /Backend/html/');

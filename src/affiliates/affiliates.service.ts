@@ -267,17 +267,10 @@ export class AffiliatesService {
         `"totalRevenueGenerated" + ${data.subscriptionAmount}`,
     });
 
-    // Update affiliate earnings
-    await this.affiliateProfileRepo.increment(
-      { id: data.affiliateId },
-      'totalEarnings',
-      commissionAmount,
-    );
-    await this.affiliateProfileRepo.increment(
-      { id: data.affiliateId },
-      'pendingBalance',
-      commissionAmount,
-    );
+    // Profile-level totalEarnings / pendingBalance are NOT incremented here.
+    // Those columns mix amounts across currencies (e.g. NGN + USD in one float),
+    // making them meaningless. All balance calculations query the commissions
+    // table directly, filtered by currency.
 
     await this.loggerService.log({
       action: LogActionTypes.PAYMENT,
@@ -310,8 +303,8 @@ export class AffiliatesService {
 
     if (!profile) return null;
 
-    let totalEarnings = profile.totalEarnings;
-    let pendingBalance = profile.pendingBalance;
+    let totalEarnings = 0;
+    let pendingBalance = 0;
     let totalPaidOut = 0;
 
     if (currency) {
@@ -343,7 +336,24 @@ export class AffiliatesService {
         .getRawOne<{ total: string }>();
       totalPaidOut = parseFloat(paidOutResult?.total || '0');
     } else {
-      // Aggregate totalPaidOut across all currencies from completed payouts
+      // No currency filter — compute from commissions across all currencies.
+      // Note: cross-currency sums are not meaningful for display; the frontend
+      // should always request a specific currency for accurate balance figures.
+      const earningsResult = await this.commissionRepo
+        .createQueryBuilder('c')
+        .select('COALESCE(SUM(c.amount), 0)', 'total')
+        .where('c.affiliateId = :affiliateId', { affiliateId: profile.id })
+        .getRawOne<{ total: string }>();
+      totalEarnings = parseFloat(earningsResult?.total || '0');
+
+      const pendingResult = await this.commissionRepo
+        .createQueryBuilder('c')
+        .select('COALESCE(SUM(c.amount), 0)', 'total')
+        .where('c.affiliateId = :affiliateId', { affiliateId: profile.id })
+        .andWhere('c.status = :status', { status: CommissionStatus.PENDING })
+        .getRawOne<{ total: string }>();
+      pendingBalance = parseFloat(pendingResult?.total || '0');
+
       const paidOutResult = await this.affiliatePayoutRepo
         .createQueryBuilder('p')
         .select('COALESCE(SUM(p.amount), 0)', 'total')

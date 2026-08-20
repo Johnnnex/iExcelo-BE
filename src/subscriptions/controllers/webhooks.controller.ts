@@ -14,16 +14,26 @@ import {
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { WebhookService } from '../services';
 import { Public } from '../../common/decorators';
 import { PaymentProvider } from '../../../types';
+import {
+  EMAILS_QUEUE,
+  EmailJobs,
+  SendStripeReceiptEmailJobData,
+} from '../../email/queue/email.queue';
 
 @SkipThrottle()
 @Controller('webhooks')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
 
-  constructor(private readonly webhookService: WebhookService) {}
+  constructor(
+    private readonly webhookService: WebhookService,
+    @InjectQueue(EMAILS_QUEUE) private readonly emailsQueue: Queue,
+  ) {}
 
   /**
    * Stripe webhook endpoint
@@ -96,13 +106,36 @@ export class WebhooksController {
         case 'payment_method.attached':
         case 'invoice.created':
         case 'invoice.finalized':
-        case 'charge.succeeded':
         case 'invoice_payment.paid':
         case 'billing_portal.session.created':
           // Informational events fired as side effects of the checkout / portal flow.
           // invoice_payment.paid is a newer alias; invoice.paid fires alongside it.
           // Acknowledge these to suppress WARN logs.
           break;
+
+        case 'charge.succeeded': {
+          // Send payment receipt email to customer via BullMQ.
+          // charge.succeeded is the only Stripe event with expanded card details
+          // (payment_method_details.card.*) and a receipt_url without API expansion.
+          const charge = event.data.object;
+          const chargeEmail: string | null = charge.billing_details?.email;
+          const fullName: string = charge.billing_details?.name || '';
+          const chargeFirstName = fullName.split(' ')[0] || 'there';
+          const card = charge.payment_method_details?.card;
+          if (chargeEmail && card?.last4) {
+            const jobData: SendStripeReceiptEmailJobData = {
+              email: chargeEmail,
+              firstName: chargeFirstName,
+              amount: charge.amount as number,
+              currency: charge.currency as string,
+              cardBrand: (card.brand as string) || 'card',
+              cardLast4: card.last4 as string,
+              receiptUrl: (charge.receipt_url as string) || '',
+            };
+            await this.emailsQueue.add(EmailJobs.SEND_STRIPE_RECEIPT, jobData);
+          }
+          break;
+        }
 
         case 'checkout.session.completed': {
           // Extract card details from the completed Stripe subscription and store
@@ -113,12 +146,18 @@ export class WebhooksController {
           const subscriptionId = session.metadata?.subscriptionId as
             | string
             | undefined;
+          const givebackId = session.metadata?.givebackId as string | undefined;
           const stripeSubscriptionId = session.subscription as string | null;
+
           if (subscriptionId && stripeSubscriptionId) {
+            // Student self-subscription: save card info
             await this.webhookService.handleCheckoutCompleted(
               subscriptionId,
               stripeSubscriptionId,
             );
+          } else if (givebackId) {
+            // Sponsor giveback: activate all pending subs (safety net — browser may not have called verify)
+            await this.webhookService.handleGivebackCheckoutCompleted(givebackId);
           }
           break;
         }
@@ -127,11 +166,13 @@ export class WebhooksController {
         case 'invoice.payment_succeeded': {
           const invoice = event.data.object;
 
-          // subscription_data.metadata is echoed on every invoice under
-          // subscription_details.metadata — this is where our subscriptionId lives.
-          // invoice.metadata itself is always empty for subscription invoices.
+          // Stripe API 2026-01-28.clover moved subscription_details from the invoice
+          // root to invoice.parent.subscription_details. Fall back to invoice.metadata
+          // for older events still in the queue.
           const subMeta =
-            invoice.subscription_details?.metadata || invoice.metadata || {};
+            invoice.parent?.subscription_details?.metadata ||
+            invoice.metadata ||
+            {};
           const subscriptionId: string | undefined = subMeta.subscriptionId;
 
           const stripeCard =
@@ -352,36 +393,43 @@ export class WebhooksController {
       this.logger.debug(`Paystack event: ${payload.event}, ID: ${eventId}`);
 
       switch (payload.event) {
-        case 'charge.success':
-          await this.webhookService.handlePaymentSucceeded(
-            PaymentProvider.PAYSTACK,
-            payload.data.reference,
-            payload.data.metadata || {},
-            // Pass customer info so we can match subscription.create later
-            payload.data.customer
-              ? {
-                  customerCode: payload.data.customer.customer_code,
-                  email: payload.data.customer.email,
-                }
-              : undefined,
-            // Pass payment data for transaction creation
-            {
-              amount: payload.data.amount,
-              currency: payload.data.currency,
-            },
-            // Card info from authorization object — saved to subscription for display
-            payload.data.authorization
-              ? {
-                  brand: payload.data.authorization.brand ?? null,
-                  last4: payload.data.authorization.last4 ?? null,
-                  expMonth: payload.data.authorization.exp_month ?? null,
-                  expYear: payload.data.authorization.exp_year ?? null,
-                  bank: payload.data.authorization.bank ?? null,
-                  channel: payload.data.authorization.channel ?? null,
-                }
-              : undefined,
-          );
+        case 'charge.success': {
+          const meta = payload.data.metadata || {};
+          // Sponsor giveback — activate all pending subs for this batch
+          if (meta.givebackId) {
+            await this.webhookService.handleGivebackCheckoutCompleted(
+              meta.givebackId as string,
+            );
+          } else {
+            // Student self-subscription
+            await this.webhookService.handlePaymentSucceeded(
+              PaymentProvider.PAYSTACK,
+              payload.data.reference,
+              meta,
+              payload.data.customer
+                ? {
+                    customerCode: payload.data.customer.customer_code,
+                    email: payload.data.customer.email,
+                  }
+                : undefined,
+              {
+                amount: payload.data.amount,
+                currency: payload.data.currency,
+              },
+              payload.data.authorization
+                ? {
+                    brand: payload.data.authorization.brand ?? null,
+                    last4: payload.data.authorization.last4 ?? null,
+                    expMonth: payload.data.authorization.exp_month ?? null,
+                    expYear: payload.data.authorization.exp_year ?? null,
+                    bank: payload.data.authorization.bank ?? null,
+                    channel: payload.data.authorization.channel ?? null,
+                  }
+                : undefined,
+            );
+          }
           break;
+        }
 
         case 'charge.failed':
           await this.webhookService.handlePaymentFailed(

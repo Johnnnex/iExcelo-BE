@@ -20,14 +20,6 @@ export class PlanPriceDto {
   @IsNumber()
   @Min(0)
   amount: number;
-
-  @IsOptional()
-  @IsString()
-  stripePriceId?: string;
-
-  @IsOptional()
-  @IsString()
-  paystackPlanCode?: string;
 }
 
 export class CreateSubscriptionPlanDto {
@@ -88,12 +80,4 @@ export class UpsertPlanPriceDto {
   @IsNumber()
   @Min(0)
   amount: number;
-
-  @IsOptional()
-  @IsString()
-  stripePriceId?: string;
-
-  @IsOptional()
-  @IsString()
-  paystackPlanCode?: string;
 }

@@ -4,3 +4,4 @@ export * from './transaction.entity';
 export * from './webhook-event.entity';
 export * from './region-currency.entity';
 export * from './plan-price.entity';
+export * from './plan-price-provider.entity';

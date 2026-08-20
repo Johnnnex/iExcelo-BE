@@ -8,6 +8,7 @@ import { HttpExceptionFilter } from './common/filters';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { ApiKeyGuard } from './common/guards';
 import { ConfigService } from '@nestjs/config';
+import { RedisIoAdapter } from './redis-io.adapter';
 
 async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -20,6 +21,11 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const reflector = app.get(Reflector);
   const logger = new Logger('Bootstrap');
+
+  // ========== WebSocket Adapter (Redis) ==========
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis(configService);
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // ========== Global Prefix ==========
   app.setGlobalPrefix('api/v1');

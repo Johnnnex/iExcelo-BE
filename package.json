@@ -22,7 +22,9 @@
     "migrate:list": "npm run migrate -- --list",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/typeorm.config.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/typeorm.config.ts",
-    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/typeorm.config.ts"
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/typeorm.config.ts",
+    "fix-tables:dry": "ts-node -r tsconfig-paths/register --project tsconfig.migrate.json scripts/fix-gfm-tables.ts",
+    "fix-tables:apply": "ts-node -r tsconfig-paths/register --project tsconfig.migrate.json scripts/fix-gfm-tables.ts --apply"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1035.0",
@@ -39,6 +41,7 @@
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.17",
+    "@socket.io/redis-adapter": "^8.3.0",
     "@types/multer": "^2.0.0",
     "@types/turndown": "^5.0.6",
     "@types/web-push": "^3.6.4",
@@ -47,6 +50,7 @@
     "cache-manager": "^7.2.8",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "ioredis": "^5.11.1",
     "nanoid": "^5.1.7",
     "nodemailer": "^7.0.11",
     "passport-google-oauth20": "^2.0.0",

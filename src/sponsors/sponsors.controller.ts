@@ -261,6 +261,7 @@ export class SponsorsController {
       examTypeId: string;
       planId: string;
       planPriceId: string;
+      provider: string;
       customerEmail: string;
       callbackUrl: string;
       region?: string;
@@ -317,6 +318,7 @@ export class SponsorsController {
       examTypeId: string;
       planId: string;
       planPriceId: string;
+      provider: string;
       customerEmail: string;
       callbackUrl: string;
       region?: string;

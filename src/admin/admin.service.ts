@@ -16,7 +16,10 @@ import { AdminProfile } from './entities/admin-profile.entity';
 import { AdminRole, ModulePermissionsMap } from './entities/admin-role.entity';
 import { AdminInvite, AdminInviteStatus } from './entities/admin-invite.entity';
 import { User } from '../users/entities/user.entity';
-import { UserType } from '../../types';
+import { Question } from '../exams/entities/question.entity';
+import { ExamAttempt } from '../students/entities/exam-attempt.entity';
+import { Subscription } from '../subscriptions/entities/subscription.entity';
+import { UserType, SubscriptionStatus } from '../../types';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
@@ -30,6 +33,12 @@ export class AdminService {
     private adminInviteRepo: Repository<AdminInvite>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(Question)
+    private questionRepo: Repository<Question>,
+    @InjectRepository(ExamAttempt)
+    private examAttemptRepo: Repository<ExamAttempt>,
+    @InjectRepository(Subscription)
+    private subscriptionRepo: Repository<Subscription>,
     private jwtService: JwtService,
     @Inject(CACHE_MANAGER) private cache: Cache,
     private emailService: EmailService,
@@ -306,21 +315,86 @@ export class AdminService {
   // ─── Platform analytics (called by controller) ─────────────────────────────
 
   async getPlatformStats() {
-    const [totalStudents, totalSponsors, totalAffiliates] = await Promise.all([
+    const QUESTION_TYPE_COLORS: Record<string, string> = {
+      multiple_choice: '#007FFF',
+      true_false: '#099137',
+      multiple_response: '#A12161',
+      essay: '#F3A218',
+      fill_in_the_blank: '#D42620',
+      short_answer: '#8B5CF6',
+      matching: '#06B6D4',
+    };
+    const QUESTION_TYPE_LABELS: Record<string, string> = {
+      multiple_choice: 'Multiple Choice',
+      true_false: 'True / False',
+      multiple_response: 'Multi-Response',
+      essay: 'Essay',
+      fill_in_the_blank: 'Fill in Blank',
+      short_answer: 'Short Answer',
+      matching: 'Matching',
+    };
+    const SUB_COLORS = ['#007FFF', '#A12161', '#099137', '#F3A218', '#D42620', '#8B5CF6', '#06B6D4'];
+
+    const [
+      totalStudents,
+      totalSponsors,
+      totalAffiliates,
+      totalQuestionsInBank,
+      avgResult,
+      typeRows,
+      subRows,
+      totalActiveSubscriptions,
+    ] = await Promise.all([
       this.userRepo.count({ where: { role: UserType.STUDENT } }),
       this.userRepo.count({ where: { role: UserType.SPONSOR } }),
       this.userRepo.count({ where: { role: UserType.AFFILIATE } }),
+      this.questionRepo.count(),
+      this.examAttemptRepo
+        .createQueryBuilder('ea')
+        .select('ROUND(AVG(ea."scorePercentage")::numeric, 1)', 'avg')
+        .getRawOne<{ avg: string | null }>(),
+      this.questionRepo
+        .createQueryBuilder('q')
+        .select(['q.type AS type', 'COUNT(*) AS count'])
+        .groupBy('q.type')
+        .getRawMany<{ type: string; count: string }>(),
+      this.subscriptionRepo
+        .createQueryBuilder('s')
+        .leftJoin('s.examType', 'et')
+        .select(['et.name AS name', 'COUNT(*) AS count'])
+        .where('s.status = :status', { status: SubscriptionStatus.ACTIVE })
+        .groupBy('et.name')
+        .getRawMany<{ name: string; count: string }>(),
+      this.subscriptionRepo.count({ where: { status: SubscriptionStatus.ACTIVE } }),
     ]);
 
     const totalUsers = totalStudents + totalSponsors + totalAffiliates;
+    const avgPlatformScore = avgResult?.avg ? Number(avgResult.avg) : 0;
+
+    const questionTypeBreakdown = typeRows.map((r) => ({
+      name: QUESTION_TYPE_LABELS[r.type] ?? r.type,
+      value: Number(r.count),
+      fill: QUESTION_TYPE_COLORS[r.type] ?? '#757575',
+    }));
+
+    const subscriptionBreakdown = subRows.map((r, i) => ({
+      name: r.name ?? 'Unknown',
+      value: Number(r.count),
+      fill: SUB_COLORS[i % SUB_COLORS.length],
+    }));
 
     return {
       totalUsers,
+      totalQuestionsInBank,
+      avgPlatformScore,
+      totalActiveSubscriptions,
       userBreakdown: [
         { name: 'Students', value: totalStudents, fill: '#007FFF' },
         { name: 'Sponsors', value: totalSponsors, fill: '#A12161' },
         { name: 'Affiliates', value: totalAffiliates, fill: '#099137' },
       ],
+      questionTypeBreakdown,
+      subscriptionBreakdown,
     };
   }
 

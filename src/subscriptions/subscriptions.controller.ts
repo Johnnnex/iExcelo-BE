@@ -9,6 +9,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { SubscriptionsService } from './subscriptions.service';
 import { SubscriptionPlansService, CheckoutService } from './services';
 import { InitiateSubscriptionDto, UpgradeSubscriptionDto } from './dto';
@@ -23,6 +24,7 @@ export class SubscriptionsController {
     private readonly subscriptionsService: SubscriptionsService,
     private readonly plansService: SubscriptionPlansService,
     private readonly checkoutService: CheckoutService,
+    private readonly configService: ConfigService,
   ) {}
 
   // === PUBLIC ROUTES ===
@@ -152,22 +154,26 @@ export class SubscriptionsController {
       throw new BadRequestException('Student profile not found');
     }
 
-    // Get checkout info for the region to determine provider and currency
+    // Get checkout info for the region to determine currency
     const checkoutInfo = await this.subscriptionsService.getCheckoutInfo(
       dto.examTypeId,
       dto.region,
     );
 
     const baseUrl =
-      dto.redirectUrl || req.headers.origin || 'http://localhost:3001';
+      dto.redirectUrl ||
+      req.headers.origin ||
+      this.configService.get('FRONTEND_URL') ||
+      'https://iexcelo.com';
     const successUrl = `${baseUrl}/student/upgrade/confirmed`;
     const cancelUrl = `${baseUrl}/student/upgrade?examTypeId=${dto.examTypeId}`;
 
-    if (checkoutInfo.provider === PaymentProvider.STRIPE) {
+    if (dto.provider === PaymentProvider.STRIPE) {
       const result = await this.checkoutService.createStripeCheckoutSession({
         studentId,
         examTypeId: dto.examTypeId,
         planId: dto.planId,
+        provider: dto.provider,
         currency: checkoutInfo.currency,
         successUrl,
         cancelUrl,
@@ -183,11 +189,12 @@ export class SubscriptionsController {
           authorizationUrl: result.authorizationUrl,
         },
       };
-    } else if (checkoutInfo.provider === PaymentProvider.PAYSTACK) {
+    } else if (dto.provider === PaymentProvider.PAYSTACK) {
       const result = await this.checkoutService.createPaystackCheckoutSession({
         studentId,
         examTypeId: dto.examTypeId,
         planId: dto.planId,
+        provider: dto.provider,
         currency: checkoutInfo.currency,
         successUrl,
         cancelUrl,
@@ -508,10 +515,14 @@ export class SubscriptionsController {
       subscription.paymentProvider === PaymentProvider.STRIPE &&
       subscription.providerCustomerId
     ) {
-      const baseUrl = req.headers.origin || 'http://localhost:3001';
+      const baseUrl =
+        req.headers.origin ||
+        this.configService.get('FRONTEND_URL') ||
+        'https://iexcelo.com';
       link = await this.subscriptionsService.getStripeManageLink(
         subscription.providerCustomerId,
         `${baseUrl}/student/settings/billing`,
+        subscription.providerSubscriptionId ?? undefined,
       );
     }
 
@@ -619,7 +630,10 @@ export class SubscriptionsController {
     // Stripe reactivation: old subscription is cancelled (gone at Stripe).
     // Return a fresh checkout URL so the student re-subscribes on the same plan.
     if (subscription.paymentProvider === PaymentProvider.STRIPE) {
-      const baseUrl = req.headers.origin || 'http://localhost:3001';
+      const baseUrl =
+        req.headers.origin ||
+        this.configService.get('FRONTEND_URL') ||
+        'https://iexcelo.com';
       const successUrl = `${baseUrl}/student/upgrade/confirmed`;
       const cancelUrl = `${baseUrl}/student/subscriptions?examTypeId=${examTypeId}`;
 
@@ -627,6 +641,7 @@ export class SubscriptionsController {
         studentId,
         examTypeId,
         planId: subscription.planId,
+        provider: PaymentProvider.STRIPE,
         currency: subscription.currency,
         successUrl,
         cancelUrl,
@@ -665,7 +680,14 @@ export class SubscriptionsController {
       subscription.currency,
     );
 
-    if (!planPrice || !planPrice.paystackPlanCode) {
+    const paystackProvider = planPrice
+      ? await this.subscriptionsService.findPlanPriceProvider(
+          planPrice.id,
+          PaymentProvider.PAYSTACK,
+        )
+      : null;
+
+    if (!planPrice || !paystackProvider?.paystackPlanCode) {
       throw new BadRequestException('Plan not available for your currency');
     }
 
@@ -684,7 +706,7 @@ export class SubscriptionsController {
     // Create new Paystack subscription with same plan (old one is already disabled)
     const newSub = await this.subscriptionsService.createPaystackSubscription({
       customerCode: subscription.providerCustomerId,
-      planCode: planPrice.paystackPlanCode,
+      planCode: paystackProvider.paystackPlanCode,
       authorizationCode: authCode,
     });
 
@@ -770,7 +792,14 @@ export class SubscriptionsController {
         subscription.currency,
       );
 
-      if (!targetPrice?.stripePriceId) {
+      const targetProvider = targetPrice
+        ? await this.subscriptionsService.findPlanPriceProvider(
+            targetPrice.id,
+            PaymentProvider.STRIPE,
+          )
+        : null;
+
+      if (!targetProvider?.stripePriceId) {
         throw new BadRequestException(
           'Target plan not configured for Stripe. Please contact support.',
         );
@@ -778,9 +807,9 @@ export class SubscriptionsController {
 
       await this.subscriptionsService.upgradeStripeSubscription(
         subscription.providerSubscriptionId,
-        targetPrice.stripePriceId,
+        targetProvider.stripePriceId,
         dto.targetPlanId,
-        targetPrice.id,
+        targetPrice!.id,
       );
 
       return {
@@ -810,7 +839,14 @@ export class SubscriptionsController {
       subscription.currency,
     );
 
-    if (!targetPrice || !targetPrice.paystackPlanCode) {
+    const targetPaystackProvider = targetPrice
+      ? await this.subscriptionsService.findPlanPriceProvider(
+          targetPrice.id,
+          PaymentProvider.PAYSTACK,
+        )
+      : null;
+
+    if (!targetPrice || !targetPaystackProvider?.paystackPlanCode) {
       throw new BadRequestException(
         'Target plan not available for your currency',
       );
@@ -843,7 +879,7 @@ export class SubscriptionsController {
     // 3. Create new subscription at Paystack (now that old one is disabled)
     const newSub = await this.subscriptionsService.createPaystackSubscription({
       customerCode: subscription.providerCustomerId,
-      planCode: targetPrice.paystackPlanCode,
+      planCode: targetPaystackProvider.paystackPlanCode,
       authorizationCode: authCode,
     });
 

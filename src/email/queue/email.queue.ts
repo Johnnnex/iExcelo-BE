@@ -8,6 +8,7 @@ export const EmailJobs = {
   SEND_WELCOME: 'send_welcome_email',
   SEND_SPONSORED_ACTIVATION: 'send_sponsored_activation_email',
   SEND_BULK_CAMPAIGN: 'send_bulk_campaign_email',
+  SEND_STRIPE_RECEIPT: 'send_stripe_receipt_email',
 } as const;
 
 export interface SendVerificationEmailJobData {
@@ -53,4 +54,14 @@ export interface SendBulkCampaignEmailJobData {
   subject: string;
   htmlContent: string;
   category?: string;
+}
+
+export interface SendStripeReceiptEmailJobData {
+  email: string;
+  firstName: string;
+  amount: number;
+  currency: string;
+  cardBrand: string;
+  cardLast4: string;
+  receiptUrl: string;
 }

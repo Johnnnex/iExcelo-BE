@@ -400,13 +400,20 @@ export class StudentsService {
       };
     });
 
-    // Allowed exam types for switcher (only subscribed ones)
-    const allowedExamTypes = studentExamTypes.map((set) => ({
-      id: set.examType.id,
-      name: set.examType.name,
-      isPaid: set.isPaid,
-      isDemoAllowed: set.isDemoAllowed,
-    }));
+    // Allowed exam types for switcher (only subscribed ones, deduped by exam type ID)
+    const allowedExamTypes = [
+      ...new Map(
+        studentExamTypes.map((set) => [
+          set.examType.id,
+          {
+            id: set.examType.id,
+            name: set.examType.name,
+            isPaid: set.isPaid,
+            isDemoAllowed: set.isDemoAllowed,
+          },
+        ]),
+      ).values(),
+    ];
 
     return {
       meta: {

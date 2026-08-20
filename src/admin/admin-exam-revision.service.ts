@@ -268,13 +268,13 @@ export class AdminExamRevisionService {
     return { items, total, page: opts.page, limit: opts.limit };
   }
 
-  createTopic(dto: { subjectId: string; name: string; content?: string }) {
+  createTopic(dto: { subjectId: string; name: string; content?: string; contentFormat?: 'markdown' | 'plate' }) {
     return this.topicRepo.save(this.topicRepo.create(dto));
   }
 
   async updateTopic(
     id: string,
-    dto: Partial<{ name: string; content: string; isActive: boolean }>,
+    dto: Partial<{ name: string; content: string; isActive: boolean; contentFormat: 'markdown' | 'plate' }>,
   ) {
     const t = await this.topicRepo.findOne({ where: { id } });
     if (!t) throw new NotFoundException('Topic not found');
@@ -313,6 +313,7 @@ export class AdminExamRevisionService {
       id: p.id,
       title: p.title,
       content: p.content,
+      contentFormat: p.contentFormat,
       isActive: p.isActive,
       createdAt: p.createdAt,
       examTypeSubjectIds: (p.examTypeSubjects ?? []).map((e) => e.id),
@@ -329,6 +330,7 @@ export class AdminExamRevisionService {
     examTypeSubjectIds: string[];
     title: string;
     content: string;
+    contentFormat?: 'markdown' | 'plate';
   }) {
     const etsList = await this.examTypeSubjectRepo.find({
       where: { id: In(dto.examTypeSubjectIds) },
@@ -338,6 +340,7 @@ export class AdminExamRevisionService {
     const p = this.passageRepo.create({
       title: dto.title,
       content: dto.content,
+      contentFormat: dto.contentFormat ?? 'markdown',
       examTypeSubjects: etsList,
     });
     return this.passageRepo.save(p);
@@ -349,6 +352,7 @@ export class AdminExamRevisionService {
       examTypeSubjectIds: string[];
       title: string;
       content: string;
+      contentFormat: 'markdown' | 'plate';
       isActive: boolean;
     }>,
   ) {
@@ -359,6 +363,7 @@ export class AdminExamRevisionService {
     if (!p) throw new NotFoundException('Passage not found');
     if (dto.title !== undefined) p.title = dto.title;
     if (dto.content !== undefined) p.content = dto.content;
+    if (dto.contentFormat !== undefined) p.contentFormat = dto.contentFormat;
     if (dto.isActive !== undefined) p.isActive = dto.isActive;
     if (dto.examTypeSubjectIds !== undefined) {
       p.examTypeSubjects = await this.examTypeSubjectRepo.find({
@@ -474,6 +479,8 @@ export class AdminExamRevisionService {
     topicId?: string;
     passageId?: string;
     validationConfig?: object;
+    contentFormat?: 'markdown' | 'plate';
+    discussions?: unknown[];
   }) {
     await this.validateQuestionCategory(dto.examTypeSubjectIds, dto.category);
     const etsList = await this.examTypeSubjectRepo.find({
@@ -506,6 +513,8 @@ export class AdminExamRevisionService {
       passageId: string;
       validationConfig: object;
       isActive: boolean;
+      contentFormat: 'markdown' | 'plate';
+      discussions: unknown[];
     }>,
   ) {
     const q = await this.questionRepo.findOne({

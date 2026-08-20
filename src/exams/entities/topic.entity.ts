@@ -40,6 +40,10 @@ export class Topic extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   content: string;
 
+  // 'markdown' = legacy tiptap-markdown string; 'plate' = JSON.stringify(Plate nodes)
+  @Column({ type: 'varchar', length: 20, default: 'markdown' })
+  contentFormat: 'markdown' | 'plate';
+
   @Column({ default: true })
   isActive: boolean;
 

@@ -1,6 +1,6 @@
 import { Entity, Column, Index } from 'typeorm';
 import { BaseEntity } from '../../common/entities';
-import { Currency, PaymentProvider } from '../../../types';
+import { Currency } from '../../../types';
 
 @Entity('region_currencies')
 @Index(['regionCode'], { unique: true })
@@ -18,13 +18,6 @@ export class RegionCurrency extends BaseEntity {
     default: Currency.USD,
   })
   currency: Currency;
-
-  @Column({
-    type: 'enum',
-    enum: Object.values(PaymentProvider),
-    default: PaymentProvider.STRIPE,
-  })
-  paymentProvider: PaymentProvider;
 
   @Column({ default: true })
   isActive: boolean;

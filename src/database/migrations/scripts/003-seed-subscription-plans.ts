@@ -3,6 +3,7 @@ import { IMigration } from '../migration-runner';
 import { RegionCurrency } from '../../../subscriptions/entities/region-currency.entity';
 import { SubscriptionPlan } from '../../../subscriptions/entities/subscription-plan.entity';
 import { PlanPrice } from '../../../subscriptions/entities/plan-price.entity';
+import { PlanPriceProvider } from '../../../subscriptions/entities/plan-price-provider.entity';
 import { ExamType } from '../../../exams/entities/exam-type.entity';
 import {
   regionsData,
@@ -11,7 +12,7 @@ import {
   planPricesData,
   paystackPlanCodes,
 } from '../../../subscriptions/data';
-import { Currency } from '../../../../types';
+import { Currency, PaymentProvider } from '../../../../types';
 
 export const migration003: IMigration = {
   name: '003-seed-subscription-plans',
@@ -22,6 +23,7 @@ export const migration003: IMigration = {
     const regionRepo = dataSource.getRepository(RegionCurrency);
     const planRepo = dataSource.getRepository(SubscriptionPlan);
     const priceRepo = dataSource.getRepository(PlanPrice);
+    const providerRepo = dataSource.getRepository(PlanPriceProvider);
     const examTypeRepo = dataSource.getRepository(ExamType);
 
     // ── 1. RegionCurrencies ────────────────────────────────────────────────
@@ -89,17 +91,26 @@ export const migration003: IMigration = {
           const paystackCodes = examPlanCodes[currency] || [];
           const paystackPlanCode = paystackCodes[planIdx];
 
-          await priceRepo.save(
+          const savedPrice = await priceRepo.save(
             priceRepo.create({
               planId: plan.id,
               currency,
               amount: priceData.amount,
-              stripePriceId: priceData.stripePriceId,
-              paystackPlanCode: paystackPlanCode,
               isActive: true,
             }),
           );
           pricesCreated++;
+
+          if (paystackPlanCode) {
+            await providerRepo.save(
+              providerRepo.create({
+                planPriceId: savedPrice.id,
+                provider: PaymentProvider.PAYSTACK,
+                paystackPlanCode,
+                isActive: true,
+              }),
+            );
+          }
         }
       }
     }

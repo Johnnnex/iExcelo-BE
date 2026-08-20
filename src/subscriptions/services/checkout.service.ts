@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Stripe from 'stripe';
-import { SubscriptionPlan, PlanPrice } from '../entities';
+import { SubscriptionPlan, PlanPrice, PlanPriceProvider } from '../entities';
 import { SubscriptionsService } from '../subscriptions.service';
 import { TransactionsService } from './transactions.service';
 import {
@@ -26,6 +26,8 @@ export class CheckoutService {
     private planRepo: Repository<SubscriptionPlan>,
     @InjectRepository(PlanPrice)
     private planPriceRepo: Repository<PlanPrice>,
+    @InjectRepository(PlanPriceProvider)
+    private planPriceProviderRepo: Repository<PlanPriceProvider>,
   ) {
     // Initialize Stripe if secret key is available
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
@@ -45,6 +47,7 @@ export class CheckoutService {
     studentId: string;
     examTypeId: string;
     planId: string;
+    provider: PaymentProvider;
     currency: Currency;
     successUrl: string;
     cancelUrl: string;
@@ -74,6 +77,13 @@ export class CheckoutService {
       throw new BadRequestException(`Price not available for ${data.currency}`);
     }
 
+    // Look up provider-specific config from plan_price_providers
+    const providerConfig = await this.planPriceProviderRepo.findOne({
+      where: { planPriceId: price.id, provider: data.provider, isActive: true },
+    });
+
+    const stripePriceId = providerConfig?.stripePriceId ?? null;
+
     const subscription = await this.subscriptionsService.createSubscription({
       studentId: data.studentId,
       examTypeId: data.examTypeId,
@@ -87,8 +97,8 @@ export class CheckoutService {
     // Build line items — prefer a pre-configured Stripe Price ID so that
     // Stripe can match events back to a known price and avoid orphan Price objects.
     const lineItem: Stripe.Checkout.SessionCreateParams.LineItem =
-      price.stripePriceId
-        ? { price: price.stripePriceId, quantity: 1 }
+      stripePriceId
+        ? { price: stripePriceId, quantity: 1 }
         : {
             price_data: {
               currency: data.currency.toLowerCase(),
@@ -138,8 +148,10 @@ export class CheckoutService {
 
     // Store session ID temporarily so the verify endpoint can retrieve it.
     // It will be replaced with the real sub_xxx by verifyStripeSession / webhook.
-    subscription.providerSubscriptionId = session.id;
-    await this.subscriptionsService['subscriptionRepo'].save(subscription);
+    await this.subscriptionsService.setProviderSessionId(
+      subscription.id,
+      session.id,
+    );
 
     await this.transactionsService.create({
       studentId: data.studentId,
@@ -169,6 +181,7 @@ export class CheckoutService {
     studentId: string;
     examTypeId: string;
     planId: string;
+    provider: PaymentProvider;
     currency: Currency;
     successUrl: string;
     cancelUrl: string;
@@ -203,8 +216,14 @@ export class CheckoutService {
       throw new BadRequestException(`Price not available for ${data.currency}`);
     }
 
-    // Check if we have a Paystack plan code for subscription billing
-    if (!price.paystackPlanCode) {
+    // Look up provider-specific config from plan_price_providers
+    const providerConfig = await this.planPriceProviderRepo.findOne({
+      where: { planPriceId: price.id, provider: data.provider, isActive: true },
+    });
+
+    const paystackPlanCode = providerConfig?.paystackPlanCode ?? null;
+
+    if (!paystackPlanCode) {
       throw new BadRequestException(
         'Paystack plan not configured for this price. Please set up the plan in Paystack dashboard.',
       );
@@ -241,7 +260,7 @@ export class CheckoutService {
           email: data.customerEmail,
           amount: Math.round(price.amount * 100), // Paystack uses kobo (overridden by plan amount)
           currency: data.currency,
-          plan: price.paystackPlanCode,
+          plan: paystackPlanCode,
           callback_url: data.successUrl,
           metadata: {
             subscriptionId: subscription.id,
@@ -323,9 +342,11 @@ export class CheckoutService {
 
       if (subscription) {
         const stripeSubscription = session.subscription as Stripe.Subscription;
-        subscription.providerSubscriptionId = stripeSubscription.id;
-        subscription.providerCustomerId = session.customer as string;
-        await this.subscriptionsService['subscriptionRepo'].save(subscription);
+        await this.subscriptionsService.updateSubscriptionAfterStripeCheckout(
+          subscriptionId,
+          stripeSubscription.id,
+          session.customer as string,
+        );
 
         // Persist card details (idempotent with checkout.session.completed webhook)
         await this.subscriptionsService.saveStripeCardInfoFromSubscription(

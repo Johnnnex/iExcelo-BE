@@ -31,8 +31,6 @@ export class SubscriptionPlansService {
     prices?: Array<{
       currency: Currency;
       amount: number;
-      stripePriceId?: string;
-      paystackPlanCode?: string;
     }>;
   }): Promise<SubscriptionPlan> {
     const plan = this.planRepo.create({
@@ -53,8 +51,6 @@ export class SubscriptionPlansService {
           planId: savedPlan.id,
           currency: price.currency,
           amount: price.amount,
-          stripePriceId: price.stripePriceId,
-          paystackPlanCode: price.paystackPlanCode,
           isActive: true,
         }),
       );
@@ -155,11 +151,8 @@ export class SubscriptionPlansService {
     data: {
       currency: Currency;
       amount: number;
-      stripePriceId?: string;
-      paystackPlanCode?: string;
     },
   ): Promise<PlanPrice> {
-    // Verify plan exists
     await this.findOne(planId);
 
     let price = await this.planPriceRepo.findOne({
@@ -167,11 +160,12 @@ export class SubscriptionPlansService {
     });
 
     if (price) {
-      Object.assign(price, data);
+      price.amount = data.amount;
     } else {
       price = this.planPriceRepo.create({
         planId,
-        ...data,
+        currency: data.currency,
+        amount: data.amount,
         isActive: true,
       });
     }

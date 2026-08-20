@@ -191,30 +191,52 @@ export class WebhookService {
         );
       }
     } else if (subscriptionId) {
-      // No transaction exists — create one from webhook data (idempotent fallback)
-      const subscription =
-        await this.subscriptionsService.findSubscriptionById(subscriptionId);
+      // Check for an existing PENDING transaction for this subscription first.
+      // This happens when the checkout session ID (cs_xxx) was stored at checkout
+      // but the webhook fires with a different provider ID (e.g. Stripe invoice
+      // in_xxx), so findByProviderTransactionId above returned nothing.
+      const pendingForSub =
+        await this.transactionsService.findPendingBySubscriptionId(
+          subscriptionId,
+        );
 
-      if (subscription) {
-        transaction = await this.transactionsService.create({
-          studentId: subscription.studentId,
-          studentExamTypeId: subscription.studentExamTypeId || undefined,
-          subscriptionId: subscription.id,
-          type: TransactionType.SUBSCRIPTION_PURCHASE,
-          amount: paymentData?.amount
-            ? paymentData.amount / 100
-            : subscription.amountPaid,
-          currency: (paymentData?.currency?.toUpperCase() ||
-            subscription.currency) as Currency,
-          provider,
-          providerTransactionId,
-          providerCustomerId: customerInfo?.customerCode,
-        });
-        // Mark immediately as succeeded
+      if (pendingForSub) {
         await this.transactionsService.updateStatus(
-          transaction.id,
+          pendingForSub.id,
           PaymentStatus.SUCCEEDED,
         );
+        if (customerInfo?.customerCode) {
+          await this.transactionsService.updateCustomerId(
+            pendingForSub.id,
+            customerInfo.customerCode,
+          );
+        }
+        transaction = pendingForSub;
+      } else {
+        // True fallback — no transaction at all, create one from webhook data
+        const subscription =
+          await this.subscriptionsService.findSubscriptionById(subscriptionId);
+
+        if (subscription) {
+          transaction = await this.transactionsService.create({
+            studentId: subscription.studentId,
+            studentExamTypeId: subscription.studentExamTypeId || undefined,
+            subscriptionId: subscription.id,
+            type: TransactionType.SUBSCRIPTION_PURCHASE,
+            amount: paymentData?.amount
+              ? paymentData.amount / 100
+              : subscription.amountPaid,
+            currency: (paymentData?.currency?.toUpperCase() ||
+              subscription.currency) as Currency,
+            provider,
+            providerTransactionId,
+            providerCustomerId: customerInfo?.customerCode,
+          });
+          await this.transactionsService.updateStatus(
+            transaction.id,
+            PaymentStatus.SUCCEEDED,
+          );
+        }
       }
     }
 
@@ -375,7 +397,7 @@ export class WebhookService {
       // Create renewal transaction record
       await this.transactionsService.create({
         studentId: subscription.studentId,
-        studentExamTypeId: subscription.studentExamTypeId || '',
+        studentExamTypeId: subscription.studentExamTypeId || undefined,
         subscriptionId: subscription.id,
         type: TransactionType.SUBSCRIPTION_RENEWAL,
         amount: amountInMajor,
@@ -510,6 +532,24 @@ export class WebhookService {
     this.logger.log(
       `Card info saved for subscription ${subscriptionId} from checkout`,
     );
+  }
+
+  /**
+   * Stripe webhook safety net for sponsor giveback sessions.
+   * Fires when checkout.session.completed contains a givebackId instead of
+   * a subscriptionId — meaning the sponsor's browser never called verifySponsorGiveback.
+   */
+  async handleGivebackCheckoutCompleted(givebackId: string): Promise<void> {
+    const count =
+      await this.subscriptionsService.activateGivebackSubscriptions(givebackId);
+    this.logger.log(
+      `Giveback ${givebackId}: ${count} subscription(s) activated via webhook fallback`,
+    );
+    await this.loggerService.log({
+      action: LogActionTypes.PAYMENT,
+      description: `Sponsor giveback activated via Stripe webhook fallback`,
+      metadata: { givebackId, activatedCount: count },
+    });
   }
 
   /**

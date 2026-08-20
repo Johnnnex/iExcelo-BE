@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { SubscriptionPlan } from '../subscriptions/entities/subscription-plan.entity';
 import { PlanPrice } from '../subscriptions/entities/plan-price.entity';
+import { PlanPriceProvider } from '../subscriptions/entities/plan-price-provider.entity';
 import { RegionCurrency } from '../subscriptions/entities/region-currency.entity';
 import { Currency, PaymentProvider, SubscriptionStatus } from '../../types';
 
@@ -21,6 +22,8 @@ export class AdminSubscriptionsService {
     private planRepo: Repository<SubscriptionPlan>,
     @InjectRepository(PlanPrice)
     private priceRepo: Repository<PlanPrice>,
+    @InjectRepository(PlanPriceProvider)
+    private planPriceProviderRepo: Repository<PlanPriceProvider>,
     @InjectRepository(RegionCurrency)
     private regionCurrencyRepo: Repository<RegionCurrency>,
   ) {}
@@ -120,7 +123,7 @@ export class AdminSubscriptionsService {
 
   async listPlans() {
     return this.planRepo.find({
-      relations: ['examType', 'prices'],
+      relations: ['examType', 'prices', 'prices.providers'],
       order: { examTypeId: 'ASC', sortOrder: 'ASC', durationDays: 'ASC' },
     });
   }
@@ -130,8 +133,6 @@ export class AdminSubscriptionsService {
     prices: Array<{
       currency: string;
       amount: number;
-      stripePriceId?: string;
-      paystackPlanCode?: string;
     }>,
   ) {
     for (const p of prices) {
@@ -139,11 +140,7 @@ export class AdminSubscriptionsService {
         where: { planId, currency: p.currency as Currency },
       });
       if (existing) {
-        Object.assign(existing, {
-          amount: p.amount,
-          stripePriceId: p.stripePriceId ?? existing.stripePriceId,
-          paystackPlanCode: p.paystackPlanCode ?? existing.paystackPlanCode,
-        });
+        existing.amount = p.amount;
         await this.priceRepo.save(existing);
       } else {
         await this.priceRepo.save(
@@ -151,49 +148,9 @@ export class AdminSubscriptionsService {
             planId,
             currency: p.currency as Currency,
             amount: p.amount,
-            stripePriceId: p.stripePriceId,
-            paystackPlanCode: p.paystackPlanCode,
             isActive: true,
           }),
         );
-      }
-    }
-  }
-
-  private async checkPriceConflicts(
-    prices: Array<{
-      currency: string;
-      stripePriceId?: string;
-      paystackPlanCode?: string;
-    }>,
-    excludePlanId?: string,
-  ) {
-    for (const p of prices) {
-      if (p.stripePriceId) {
-        const conflict = await this.priceRepo
-          .createQueryBuilder('pp')
-          .where('pp.stripePriceId = :id', { id: p.stripePriceId })
-          .andWhere(excludePlanId ? 'pp.planId != :planId' : '1=1', {
-            planId: excludePlanId,
-          })
-          .getOne();
-        if (conflict)
-          throw new ConflictException(
-            `Stripe price ID "${p.stripePriceId}" is already in use`,
-          );
-      }
-      if (p.paystackPlanCode) {
-        const conflict = await this.priceRepo
-          .createQueryBuilder('pp')
-          .where('pp.paystackPlanCode = :code', { code: p.paystackPlanCode })
-          .andWhere(excludePlanId ? 'pp.planId != :planId' : '1=1', {
-            planId: excludePlanId,
-          })
-          .getOne();
-        if (conflict)
-          throw new ConflictException(
-            `Paystack plan code "${p.paystackPlanCode}" is already in use`,
-          );
       }
     }
   }
@@ -208,8 +165,6 @@ export class AdminSubscriptionsService {
     prices?: Array<{
       currency: string;
       amount: number;
-      stripePriceId?: string;
-      paystackPlanCode?: string;
     }>;
   }) {
     const nameConflict = await this.planRepo
@@ -223,7 +178,6 @@ export class AdminSubscriptionsService {
       );
 
     const { prices, ...planData } = data;
-    if (prices?.length) await this.checkPriceConflicts(prices);
     const plan = await this.planRepo.save(
       this.planRepo.create({
         ...planData,
@@ -234,7 +188,7 @@ export class AdminSubscriptionsService {
     if (prices?.length) await this.upsertPrices(plan.id, prices);
     return this.planRepo.findOne({
       where: { id: plan.id },
-      relations: ['examType', 'prices'],
+      relations: ['examType', 'prices', 'prices.providers'],
     });
   }
 
@@ -250,8 +204,6 @@ export class AdminSubscriptionsService {
       prices?: Array<{
         currency: string;
         amount: number;
-        stripePriceId?: string;
-        paystackPlanCode?: string;
       }>;
     },
   ) {
@@ -272,13 +224,12 @@ export class AdminSubscriptionsService {
     }
 
     const { prices, ...planData } = data;
-    if (prices?.length) await this.checkPriceConflicts(prices, id);
     Object.assign(plan, planData);
     await this.planRepo.save(plan);
     if (prices?.length) await this.upsertPrices(id, prices);
     return this.planRepo.findOne({
       where: { id },
-      relations: ['examType', 'prices'],
+      relations: ['examType', 'prices', 'prices.providers'],
     });
   }
 
@@ -287,6 +238,90 @@ export class AdminSubscriptionsService {
     if (!plan) throw new NotFoundException('Plan not found');
     await this.planRepo.remove(plan);
     return { message: 'Plan deleted' };
+  }
+
+  // ─── Plan Price Providers ───────────────────────────────────────────────────
+
+  async listPlanPriceProviders(planPriceId: string) {
+    return this.planPriceProviderRepo.find({
+      where: { planPriceId },
+      order: { provider: 'ASC' },
+    });
+  }
+
+  async upsertPlanPriceProvider(data: {
+    planPriceId: string;
+    provider: string;
+    stripePriceId?: string | null;
+    paystackPlanCode?: string | null;
+    isActive?: boolean;
+  }) {
+    const price = await this.priceRepo.findOne({
+      where: { id: data.planPriceId },
+    });
+    if (!price) throw new NotFoundException('Plan price not found');
+
+    // Validate no duplicate stripePriceId across the table
+    if (data.stripePriceId) {
+      const conflict = await this.planPriceProviderRepo
+        .createQueryBuilder('ppp')
+        .where('ppp.stripePriceId = :id', { id: data.stripePriceId })
+        .andWhere('ppp.planPriceId != :planPriceId', {
+          planPriceId: data.planPriceId,
+        })
+        .getOne();
+      if (conflict)
+        throw new ConflictException(
+          `Stripe price ID "${data.stripePriceId}" is already in use`,
+        );
+    }
+
+    if (data.paystackPlanCode) {
+      const conflict = await this.planPriceProviderRepo
+        .createQueryBuilder('ppp')
+        .where('ppp.paystackPlanCode = :code', { code: data.paystackPlanCode })
+        .andWhere('ppp.planPriceId != :planPriceId', {
+          planPriceId: data.planPriceId,
+        })
+        .getOne();
+      if (conflict)
+        throw new ConflictException(
+          `Paystack plan code "${data.paystackPlanCode}" is already in use`,
+        );
+    }
+
+    const existing = await this.planPriceProviderRepo.findOne({
+      where: {
+        planPriceId: data.planPriceId,
+        provider: data.provider as PaymentProvider,
+      },
+    });
+
+    if (existing) {
+      if (data.stripePriceId !== undefined)
+        existing.stripePriceId = data.stripePriceId as string;
+      if (data.paystackPlanCode !== undefined)
+        existing.paystackPlanCode = data.paystackPlanCode as string;
+      if (data.isActive !== undefined) existing.isActive = data.isActive;
+      return this.planPriceProviderRepo.save(existing);
+    }
+
+    return this.planPriceProviderRepo.save(
+      this.planPriceProviderRepo.create({
+        planPriceId: data.planPriceId,
+        provider: data.provider as PaymentProvider,
+        stripePriceId: data.stripePriceId as string,
+        paystackPlanCode: data.paystackPlanCode as string,
+        isActive: data.isActive ?? true,
+      }),
+    );
+  }
+
+  async deletePlanPriceProvider(id: string) {
+    const ppp = await this.planPriceProviderRepo.findOne({ where: { id } });
+    if (!ppp) throw new NotFoundException('Provider config not found');
+    await this.planPriceProviderRepo.remove(ppp);
+    return { message: 'Provider removed' };
   }
 
   // ─── Region Currencies ─────────────────────────────────────────────────────
@@ -313,7 +348,6 @@ export class AdminSubscriptionsService {
     regionCode: string;
     regionName: string;
     currency: string;
-    paymentProvider: string;
     isActive?: boolean;
   }) {
     const existing = await this.regionCurrencyRepo.findOne({
@@ -325,9 +359,9 @@ export class AdminSubscriptionsService {
       );
     return this.regionCurrencyRepo.save(
       this.regionCurrencyRepo.create({
-        ...data,
+        regionCode: data.regionCode,
+        regionName: data.regionName,
         currency: data.currency as Currency,
-        paymentProvider: data.paymentProvider as PaymentProvider,
         isActive: data.isActive ?? true,
       }),
     );
@@ -338,13 +372,14 @@ export class AdminSubscriptionsService {
     data: {
       regionName?: string;
       currency?: string;
-      paymentProvider?: string;
       isActive?: boolean;
     },
   ) {
     const rc = await this.regionCurrencyRepo.findOne({ where: { id } });
     if (!rc) throw new NotFoundException('Region not found');
-    Object.assign(rc, data);
+    if (data.regionName !== undefined) rc.regionName = data.regionName;
+    if (data.currency !== undefined) rc.currency = data.currency as Currency;
+    if (data.isActive !== undefined) rc.isActive = data.isActive;
     return this.regionCurrencyRepo.save(rc);
   }
 }

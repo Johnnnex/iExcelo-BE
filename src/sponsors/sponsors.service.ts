@@ -652,9 +652,10 @@ export class SponsorsService {
       examTypeId: string;
       planId: string;
       planPriceId: string;
+      provider: string; // Explicit provider selected by sponsor ('stripe' | 'paystack')
       customerEmail: string;
       callbackUrl: string;
-      region?: string; // ISO country code — determines payment provider
+      region?: string; // ISO country code (legacy / fallback)
     },
   ): Promise<{
     authorizationUrl: string;
@@ -669,16 +670,10 @@ export class SponsorsService {
       'PAYSTACK_SECRET_KEY',
     );
 
-    // Resolve provider from region (same logic as student subscription checkout)
-    const checkoutInfo = data.region
-      ? await this.subscriptionsService.getCheckoutInfo(
-          data.examTypeId,
-          data.region,
-        )
-      : null;
+    // Use explicit provider selected by sponsor; fall back to Stripe if Paystack not configured
     const useStripe =
-      checkoutInfo?.provider === PaymentProvider.STRIPE ||
-      (!data.region && !paystackSecretKey && !!this.stripe);
+      (data.provider as PaymentProvider) === PaymentProvider.STRIPE ||
+      (!paystackSecretKey && !!this.stripe);
 
     if (!useStripe && !paystackSecretKey)
       throw new BadRequestException('Paystack is not configured');
@@ -1052,6 +1047,7 @@ export class SponsorsService {
       examTypeId: string;
       planId: string;
       planPriceId: string;
+      provider: string; // Explicit provider selected by sponsor
       customerEmail: string;
       callbackUrl: string;
       region?: string;
@@ -1069,15 +1065,9 @@ export class SponsorsService {
       'PAYSTACK_SECRET_KEY',
     );
 
-    const checkoutInfo = data.region
-      ? await this.subscriptionsService.getCheckoutInfo(
-          data.examTypeId,
-          data.region,
-        )
-      : null;
     const useStripe =
-      checkoutInfo?.provider === PaymentProvider.STRIPE ||
-      (!data.region && !paystackSecretKey && !!this.stripe);
+      (data.provider as PaymentProvider) === PaymentProvider.STRIPE ||
+      (!paystackSecretKey && !!this.stripe);
 
     if (!useStripe && !paystackSecretKey)
       throw new BadRequestException('Paystack is not configured');

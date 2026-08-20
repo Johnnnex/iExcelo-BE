@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional, IsString } from 'class-validator';
+import { IsUUID, IsOptional, IsString, IsIn } from 'class-validator';
 import { PaymentProvider } from '../../../types';
 
 export class InitiateSubscriptionDto {
@@ -10,6 +10,9 @@ export class InitiateSubscriptionDto {
 
   @IsString()
   region: string; // Region code for currency/provider detection
+
+  @IsIn(Object.values(PaymentProvider))
+  provider: PaymentProvider; // Which payment provider to use
 
   @IsOptional()
   @IsString()
