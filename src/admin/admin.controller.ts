@@ -726,7 +726,6 @@ export class AdminSubscriptionsController {
       description?: string;
       durationDays: number;
       sortOrder?: number;
-      stripeProductId?: string;
       prices?: Array<{
         currency: string;
         amount: number;
@@ -748,7 +747,6 @@ export class AdminSubscriptionsController {
       description?: string;
       durationDays?: number;
       sortOrder?: number;
-      stripeProductId?: string;
       isActive?: boolean;
       prices?: Array<{
         currency: string;

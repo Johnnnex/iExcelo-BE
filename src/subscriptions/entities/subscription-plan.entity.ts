@@ -32,12 +32,6 @@ export class SubscriptionPlan extends BaseEntity {
   @Column({ default: 0 })
   sortOrder: number; // For ordering plans in UI
 
-  // Stripe product ID (create in Stripe dashboard, one product per plan)
-  // A "Product" in Stripe represents the plan (e.g., "2-Month Plan")
-  // Each Product has multiple "Prices" (stored in PlanPrice entity)
-  @Column({ nullable: true })
-  stripeProductId: string;
-
   // Relations
   @ManyToOne(() => ExamType, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'examTypeId' })

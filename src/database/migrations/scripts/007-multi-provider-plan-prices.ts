@@ -15,7 +15,7 @@ export const migration007: IMigration = {
         const enumTypes: { typname: string }[] = await em.query(`
           SELECT t.typname
           FROM pg_type t
-          JOIN pg_enum e ON e.enumtypid = t.oid
+          JOIN pg_em e ON e.enumtypid = t.oid
           WHERE e.enumlabel = 'USD'
         `);
 

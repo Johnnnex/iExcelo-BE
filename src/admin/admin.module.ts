@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { PublicTestimonialsController } from './public-testimonials.controller';
 import { AdminService } from './admin.service';
 import { AdminExamRevisionService } from './admin-exam-revision.service';
 import { AdminUsersService } from './admin-users.service';
@@ -124,6 +125,7 @@ import { EMAILS_QUEUE } from '../email/queue/email.queue';
     AdminBulkEmailsController,
     AdminMessagesController,
     AdminAnalyticsController,
+    PublicTestimonialsController,
   ],
   providers: [
     AdminService,

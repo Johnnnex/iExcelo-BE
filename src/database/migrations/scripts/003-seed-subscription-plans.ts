@@ -74,7 +74,6 @@ export const migration003: IMigration = {
             description: planData.description,
             durationDays: planData.durationDays,
             sortOrder: planData.sortOrder,
-            stripeProductId: planData.stripeProductId,
             isActive: true,
           }),
         );

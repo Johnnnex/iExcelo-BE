@@ -105,7 +105,6 @@ export class SubscriptionsService {
           durationDays: planData.durationDays,
           sortOrder: planData.sortOrder,
           isActive: true,
-          stripeProductId: planData.stripeProductId,
         });
         const savedPlan = await this.planRepo.save(plan);
         plansCreated++;

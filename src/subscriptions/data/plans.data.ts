@@ -1,9 +1,6 @@
 import { Currency } from '../../../types';
 
 // Base plan definitions (applied per exam type)
-// stripeProductId: Create products in Stripe Dashboard (Products > Add Product)
-// Each plan is a separate product with multiple prices for different currencies
-// TODO: Replace placeholder IDs with actual Stripe product IDs after creating them
 export const plansData = [
   {
     name: '1-Month Plan',
@@ -11,7 +8,6 @@ export const plansData = [
     durationDays: 30,
     sortOrder: 1,
     badge: 'Starter',
-    stripeProductId: undefined, // Set via Admin panel after creating the product in Stripe Dashboard
   },
   {
     name: '2-Month Plan',
@@ -19,7 +15,6 @@ export const plansData = [
     durationDays: 60,
     sortOrder: 2,
     badge: null,
-    stripeProductId: undefined,
   },
   {
     name: '4-Month Plan',
@@ -27,7 +22,6 @@ export const plansData = [
     durationDays: 120,
     sortOrder: 3,
     badge: 'Most Popular',
-    stripeProductId: undefined,
   },
   {
     name: '6-Month Plan',
@@ -35,7 +29,6 @@ export const plansData = [
     durationDays: 180,
     sortOrder: 4,
     badge: 'Best Value',
-    stripeProductId: undefined,
   },
 ];
 
