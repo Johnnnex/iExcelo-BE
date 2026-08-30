@@ -67,8 +67,7 @@ export class GradingService {
 
   private gradeShortAnswer(question: Question, answer: string): GradeResult {
     const keywords = question.correctAnswer as string[];
-    const minMatch =
-      question.validationConfig?.keywordMinMatch ?? 1;
+    const minMatch = question.validationConfig?.keywordMinMatch ?? 1;
     const answerLower = answer.toLowerCase();
     const matched = keywords.filter((kw) =>
       answerLower.includes(kw.toLowerCase()),

@@ -76,14 +76,19 @@ export enum Currency {
   EUR = 'EUR',
   CAD = 'CAD',
   AUD = 'AUD',
-  GHS = 'GHS', // Ghanaian Cedi — Paystack
-  GMD = 'GMD', // Gambian Dalasi — Stripe
-  ZAR = 'ZAR', // South African Rand — Paystack
-  KES = 'KES', // Kenyan Shilling — Paystack
-  UGX = 'UGX', // Ugandan Shilling — Stripe
-  TZS = 'TZS', // Tanzanian Shilling — Stripe
-  XOF = 'XOF', // West African CFA franc (Benin, Ivory Coast, etc.) — Stripe
-  XAF = 'XAF', // Central African CFA franc (Cameroon, etc.) — Stripe
+  GHS = 'GHS', // Ghanaian Cedi
+  GMD = 'GMD', // Gambian Dalasi
+  ZAR = 'ZAR', // South African Rand
+  KES = 'KES', // Kenyan Shilling
+  UGX = 'UGX', // Ugandan Shilling
+  TZS = 'TZS', // Tanzanian Shilling
+  XOF = 'XOF', // West African CFA franc (Benin, Ivory Coast, etc.)
+  XAF = 'XAF', // Central African CFA franc (Cameroon, etc.)
+  LRD = 'LRD', // Liberian Dollar
+  SLE = 'SLE', // Sierra Leonean Leone
+  CDF = 'CDF', // Congolese Franc (DRC)
+  MZN = 'MZN', // Mozambican Metical
+  NAD = 'NAD', // Namibian Dollar
 }
 
 // Legacy alias for backwards compatibility - will be removed

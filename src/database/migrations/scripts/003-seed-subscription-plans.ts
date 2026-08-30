@@ -105,7 +105,7 @@ export const migration003: IMigration = {
               providerRepo.create({
                 planPriceId: savedPrice.id,
                 provider: PaymentProvider.PAYSTACK,
-                paystackPlanCode,
+                externalId: paystackPlanCode,
                 isActive: true,
               }),
             );

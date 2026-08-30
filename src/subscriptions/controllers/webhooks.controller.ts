@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+
 import {
   Controller,
   Post,
@@ -101,17 +102,56 @@ export class WebhooksController {
       switch (event.type) {
         case 'payment_intent.succeeded':
         case 'payment_intent.created':
+        case 'payment_intent.canceled':
+        case 'payment_intent.processing':
+        case 'payment_intent.requires_action':
+        case 'payment_intent.partially_funded':
         case 'customer.created':
-        case 'customer.updated':
         case 'payment_method.attached':
         case 'invoice.created':
         case 'invoice.finalized':
         case 'invoice_payment.paid':
         case 'billing_portal.session.created':
-          // Informational events fired as side effects of the checkout / portal flow.
-          // invoice_payment.paid is a newer alias; invoice.paid fires alongside it.
-          // Acknowledge these to suppress WARN logs.
+        case 'customer.subscription.pending_update_applied':
+        case 'customer.subscription.pending_update_expired':
+        case 'customer.subscription.resumed':
+          // Informational or feature-specific events iExcelo doesn't act on.
+          // Acknowledged to suppress WARN logs.
           break;
+
+        case 'customer.subscription.paused': {
+          // Fires when a subscription is paused from the Stripe dashboard.
+          // iExcelo doesn't expose pause to users, but guard against accidental
+          // dashboard pauses — treat the same as a cancellation so the student
+          // doesn't retain access while the subscription is suspended at Stripe.
+          const pausedSub = event.data.object;
+          await this.webhookService.handleSubscriptionCancelled(
+            PaymentProvider.STRIPE,
+            pausedSub.id as string,
+          );
+          break;
+        }
+
+        case 'customer.updated': {
+          // When a customer updates their default payment method (e.g. via the
+          // billing portal card-update flow), sync the new card info to all their
+          // active Stripe subscriptions so the billing page stays accurate.
+          const customer = event.data.object;
+          const prevAttrs = event.data.previous_attributes as
+            | Record<string, unknown>
+            | undefined;
+          const rawPmId = customer.invoice_settings?.default_payment_method;
+          const newPmId: string | null =
+            typeof rawPmId === 'string' ? rawPmId : null;
+          const pmChanged = !!prevAttrs?.invoice_settings;
+          if (pmChanged && newPmId && typeof newPmId === 'string') {
+            await this.webhookService.handleCustomerDefaultPmUpdated(
+              String(customer.id),
+              newPmId,
+            );
+          }
+          break;
+        }
 
         case 'charge.succeeded': {
           // Send payment receipt email to customer via BullMQ.
@@ -157,7 +197,9 @@ export class WebhooksController {
             );
           } else if (givebackId) {
             // Sponsor giveback: activate all pending subs (safety net — browser may not have called verify)
-            await this.webhookService.handleGivebackCheckoutCompleted(givebackId);
+            await this.webhookService.handleGivebackCheckoutCompleted(
+              givebackId,
+            );
           }
           break;
         }

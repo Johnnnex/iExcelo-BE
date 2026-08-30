@@ -190,7 +190,12 @@ export class EmailService {
   }) {
     const { email, ...rest } = params;
     const { subject, html } = getStripeReceiptEmailTemplate(rest);
-    await this.transporter.sendMail({ from: this.from, to: email, subject, html });
+    await this.transporter.sendMail({
+      from: this.from,
+      to: email,
+      subject,
+      html,
+    });
   }
 
   async sendBulkCampaignEmail(

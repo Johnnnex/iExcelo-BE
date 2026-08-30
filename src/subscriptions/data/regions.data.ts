@@ -21,9 +21,12 @@ export const regionsData = [
   { regionCode: 'CI', regionName: "Côte d'Ivoire", currency: Currency.XOF },
   { regionCode: 'SN', regionName: 'Senegal', currency: Currency.XOF },
   { regionCode: 'CM', regionName: 'Cameroon', currency: Currency.XAF },
-  { regionCode: 'LR', regionName: 'Liberia', currency: Currency.USD },
+  { regionCode: 'LR', regionName: 'Liberia', currency: Currency.LRD },
   { regionCode: 'GM', regionName: 'Gambia', currency: Currency.GMD },
-  { regionCode: 'SL', regionName: 'Sierra Leone', currency: Currency.USD },
+  { regionCode: 'SL', regionName: 'Sierra Leone', currency: Currency.SLE },
+  { regionCode: 'CD', regionName: 'DR Congo', currency: Currency.CDF },
+  { regionCode: 'MZ', regionName: 'Mozambique', currency: Currency.MZN },
+  { regionCode: 'NA', regionName: 'Namibia', currency: Currency.NAD },
 ];
 
 export const defaultRegion = {

@@ -250,8 +250,7 @@ export class AdminSubscriptionsService {
   async upsertPlanPriceProvider(data: {
     planPriceId: string;
     provider: string;
-    stripePriceId?: string | null;
-    paystackPlanCode?: string | null;
+    externalId?: string | null;
     isActive?: boolean;
   }) {
     const price = await this.priceRepo.findOne({
@@ -259,32 +258,17 @@ export class AdminSubscriptionsService {
     });
     if (!price) throw new NotFoundException('Plan price not found');
 
-    // Validate no duplicate stripePriceId across the table
-    if (data.stripePriceId) {
+    if (data.externalId) {
       const conflict = await this.planPriceProviderRepo
         .createQueryBuilder('ppp')
-        .where('ppp.stripePriceId = :id', { id: data.stripePriceId })
+        .where('ppp.externalId = :id', { id: data.externalId })
         .andWhere('ppp.planPriceId != :planPriceId', {
           planPriceId: data.planPriceId,
         })
         .getOne();
       if (conflict)
         throw new ConflictException(
-          `Stripe price ID "${data.stripePriceId}" is already in use`,
-        );
-    }
-
-    if (data.paystackPlanCode) {
-      const conflict = await this.planPriceProviderRepo
-        .createQueryBuilder('ppp')
-        .where('ppp.paystackPlanCode = :code', { code: data.paystackPlanCode })
-        .andWhere('ppp.planPriceId != :planPriceId', {
-          planPriceId: data.planPriceId,
-        })
-        .getOne();
-      if (conflict)
-        throw new ConflictException(
-          `Paystack plan code "${data.paystackPlanCode}" is already in use`,
+          `Provider ID "${data.externalId}" is already in use`,
         );
     }
 
@@ -296,10 +280,8 @@ export class AdminSubscriptionsService {
     });
 
     if (existing) {
-      if (data.stripePriceId !== undefined)
-        existing.stripePriceId = data.stripePriceId as string;
-      if (data.paystackPlanCode !== undefined)
-        existing.paystackPlanCode = data.paystackPlanCode as string;
+      if (data.externalId !== undefined)
+        existing.externalId = data.externalId as string;
       if (data.isActive !== undefined) existing.isActive = data.isActive;
       return this.planPriceProviderRepo.save(existing);
     }
@@ -308,8 +290,7 @@ export class AdminSubscriptionsService {
       this.planPriceProviderRepo.create({
         planPriceId: data.planPriceId,
         provider: data.provider as PaymentProvider,
-        stripePriceId: data.stripePriceId as string,
-        paystackPlanCode: data.paystackPlanCode as string,
+        externalId: data.externalId as string,
         isActive: data.isActive ?? true,
       }),
     );

@@ -16,10 +16,7 @@ export class PlanPriceProvider extends BaseEntity {
   provider: PaymentProvider;
 
   @Column({ nullable: true })
-  stripePriceId: string;
-
-  @Column({ nullable: true })
-  paystackPlanCode: string;
+  externalId: string;
 
   @Column({ default: true })
   isActive: boolean;

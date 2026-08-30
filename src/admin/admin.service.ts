@@ -333,7 +333,15 @@ export class AdminService {
       short_answer: 'Short Answer',
       matching: 'Matching',
     };
-    const SUB_COLORS = ['#007FFF', '#A12161', '#099137', '#F3A218', '#D42620', '#8B5CF6', '#06B6D4'];
+    const SUB_COLORS = [
+      '#007FFF',
+      '#A12161',
+      '#099137',
+      '#F3A218',
+      '#D42620',
+      '#8B5CF6',
+      '#06B6D4',
+    ];
 
     const [
       totalStudents,
@@ -365,7 +373,9 @@ export class AdminService {
         .where('s.status = :status', { status: SubscriptionStatus.ACTIVE })
         .groupBy('et.name')
         .getRawMany<{ name: string; count: string }>(),
-      this.subscriptionRepo.count({ where: { status: SubscriptionStatus.ACTIVE } }),
+      this.subscriptionRepo.count({
+        where: { status: SubscriptionStatus.ACTIVE },
+      }),
     ]);
 
     const totalUsers = totalStudents + totalSponsors + totalAffiliates;

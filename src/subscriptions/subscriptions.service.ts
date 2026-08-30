@@ -131,7 +131,7 @@ export class SubscriptionsService {
               this.planPriceProviderRepo.create({
                 planPriceId: price.id,
                 provider: PaymentProvider.PAYSTACK,
-                paystackPlanCode: paystackCode,
+                externalId: paystackCode,
                 isActive: true,
               }),
             );
@@ -223,8 +223,7 @@ export class SubscriptionsService {
    * Returns the number of subscriptions successfully activated.
    */
   async activateGivebackSubscriptions(givebackId: string): Promise<number> {
-    const givebackRepo =
-      this.subscriptionRepo.manager.getRepository(Giveback);
+    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
     const giveback = await givebackRepo.findOne({ where: { id: givebackId } });
     if (!giveback) return 0;
 
@@ -1111,6 +1110,50 @@ export class SubscriptionsService {
   }
 
   /**
+   * Update card info on all ACTIVE Stripe subscriptions for a customer from a
+   * Stripe PaymentMethod object. Called when customer.updated fires with a new
+   * default_payment_method. Uses a single bulk UPDATE for efficiency.
+   */
+  async updateCardInfoFromStripePaymentMethod(
+    providerCustomerId: string,
+    paymentMethodId: string,
+  ): Promise<number> {
+    if (!this.stripe) return 0;
+
+    let pm: Stripe.PaymentMethod;
+    try {
+      pm = await this.stripe.paymentMethods.retrieve(paymentMethodId);
+    } catch {
+      return 0;
+    }
+
+    const card = pm.card;
+    if (!card) return 0;
+
+    const result = await this.subscriptionRepo
+      .createQueryBuilder()
+      .update()
+      .set({
+        cardBrand: card.brand,
+        cardLast4: card.last4,
+        cardExpMonth: String(card.exp_month),
+        cardExpYear: String(card.exp_year),
+        cardChannel: 'card',
+      })
+      .where(
+        'providerCustomerId = :customerId AND paymentProvider = :provider AND status = :status',
+        {
+          customerId: providerCustomerId,
+          provider: PaymentProvider.STRIPE,
+          status: SubscriptionStatus.ACTIVE,
+        },
+      )
+      .execute();
+
+    return result.affected ?? 0;
+  }
+
+  /**
    * Find a recent subscription by provider customer ID and plan code.
    * Used by subscription.create webhook to match Paystack subscription_code
    * to our internal subscription after the initial charge.success has fired.
@@ -1122,13 +1165,15 @@ export class SubscriptionsService {
   ): Promise<Subscription | null> {
     // Find plan prices that match this Paystack plan code via PlanPriceProvider
     const matchingProviders = await this.planPriceProviderRepo.find({
-      where: { paystackPlanCode: planCode, isActive: true },
+      where: { externalId: planCode, isActive: true },
       relations: ['planPrice'],
     });
 
     if (matchingProviders.length === 0) return null;
 
-    const planIds = [...new Set(matchingProviders.map((p) => p.planPrice.planId))];
+    const planIds = [
+      ...new Set(matchingProviders.map((p) => p.planPrice.planId)),
+    ];
 
     // Search ACTIVE first, then PENDING (charge.success may not have activated yet)
     const statusPriority = [
@@ -1171,11 +1216,13 @@ export class SubscriptionsService {
   ): Promise<Subscription | null> {
     // Resolve planCode (PLN_xxx) → planIds via PlanPriceProvider
     const matchingProviders = await this.planPriceProviderRepo.find({
-      where: { paystackPlanCode: planCode, isActive: true },
+      where: { externalId: planCode, isActive: true },
       relations: ['planPrice'],
     });
     if (matchingProviders.length === 0) return null;
-    const planIds = [...new Set(matchingProviders.map((p) => p.planPrice.planId))];
+    const planIds = [
+      ...new Set(matchingProviders.map((p) => p.planPrice.planId)),
+    ];
 
     // Join through StudentProfile → User, filter by email + plan + provider
     return this.subscriptionRepo
@@ -2004,19 +2051,15 @@ export class SubscriptionsService {
   async getStripeManageLink(
     customerId: string,
     returnUrl: string,
-    providerSubscriptionId?: string,
   ): Promise<string | null> {
     if (!this.stripe || !customerId) return null;
     try {
       const session = await this.stripe.billingPortal.sessions.create({
         customer: customerId,
         return_url: returnUrl,
-        ...(providerSubscriptionId && {
-          flow_data: {
-            type: 'subscription_update',
-            subscription_update: { subscription: providerSubscriptionId },
-          },
-        }),
+        flow_data: {
+          type: 'payment_method_update',
+        },
       });
       return session.url;
     } catch (err) {

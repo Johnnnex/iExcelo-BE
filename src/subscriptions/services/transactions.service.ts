@@ -94,6 +94,19 @@ export class TransactionsService {
   }
 
   /**
+   * Stamp a provider transaction ID onto an existing record.
+   * Used when a PENDING transaction created with a checkout session ID (cs_xxx)
+   * is later resolved via an invoice ID (in_xxx) — updating the field lets
+   * subsequent webhook calls find the record directly and skip the duplicate-creation path.
+   */
+  async updateProviderTransactionId(
+    transactionId: string,
+    providerTransactionId: string,
+  ): Promise<void> {
+    await this.transactionRepo.update(transactionId, { providerTransactionId });
+  }
+
+  /**
    * Update transaction status
    */
   async updateStatus(

@@ -729,8 +729,6 @@ export class AdminSubscriptionsController {
       prices?: Array<{
         currency: string;
         amount: number;
-        stripePriceId?: string;
-        paystackPlanCode?: string;
       }>;
     },
   ) {
@@ -751,8 +749,6 @@ export class AdminSubscriptionsController {
       prices?: Array<{
         currency: string;
         amount: number;
-        stripePriceId?: string;
-        paystackPlanCode?: string;
       }>;
     },
   ) {
@@ -822,8 +818,7 @@ export class AdminSubscriptionsController {
     @Body()
     body: {
       provider: string;
-      stripePriceId?: string | null;
-      paystackPlanCode?: string | null;
+      externalId?: string | null;
       isActive?: boolean;
     },
   ) {

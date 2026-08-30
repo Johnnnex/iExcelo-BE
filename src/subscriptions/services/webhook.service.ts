@@ -205,6 +205,18 @@ export class WebhookService {
           pendingForSub.id,
           PaymentStatus.SUCCEEDED,
         );
+        // Stamp the real provider transaction ID (e.g. Stripe invoice in_xxx) so
+        // subsequent calls to handlePaymentSucceeded with the same ID find this
+        // record directly and don't fall through to create a duplicate.
+        if (
+          providerTransactionId &&
+          pendingForSub.providerTransactionId !== providerTransactionId
+        ) {
+          await this.transactionsService.updateProviderTransactionId(
+            pendingForSub.id,
+            providerTransactionId,
+          );
+        }
         if (customerInfo?.customerCode) {
           await this.transactionsService.updateCustomerId(
             pendingForSub.id,
@@ -531,6 +543,25 @@ export class WebhookService {
     );
     this.logger.log(
       `Card info saved for subscription ${subscriptionId} from checkout`,
+    );
+  }
+
+  /**
+   * Handle customer.updated when default_payment_method changes.
+   * Updates card info on all ACTIVE Stripe subscriptions for the customer so
+   * the billing page always shows the card that will actually be charged.
+   */
+  async handleCustomerDefaultPmUpdated(
+    customerId: string,
+    newPmId: string,
+  ): Promise<void> {
+    const count =
+      await this.subscriptionsService.updateCardInfoFromStripePaymentMethod(
+        customerId,
+        newPmId,
+      );
+    this.logger.log(
+      `Card info synced for ${count} active sub(s) on customer ${customerId}`,
     );
   }
 

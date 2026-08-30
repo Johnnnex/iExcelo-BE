@@ -196,7 +196,15 @@ export class EmailsProcessor extends WorkerHost {
   private async handleSendStripeReceipt(
     job: Job<SendStripeReceiptEmailJobData>,
   ): Promise<void> {
-    const { email, firstName, amount, currency, cardBrand, cardLast4, receiptUrl } = job.data;
+    const {
+      email,
+      firstName,
+      amount,
+      currency,
+      cardBrand,
+      cardLast4,
+      receiptUrl,
+    } = job.data;
     this.logger.log(`Sending Stripe receipt email to ${email}`);
     try {
       await this.emailService.sendStripeReceiptEmail({

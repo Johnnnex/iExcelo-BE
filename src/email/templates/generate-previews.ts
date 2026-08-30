@@ -190,7 +190,8 @@ function write(filename: string, html: string) {
     currency: 'eur',
     cardBrand: 'mastercard',
     cardLast4: '5454',
-    receiptUrl: 'https://pay.stripe.com/receipts/acct_example/ch_example/rcpt_example',
+    receiptUrl:
+      'https://pay.stripe.com/receipts/acct_example/ch_example/rcpt_example',
   });
   write('09-stripe-receipt.html', html);
 })();

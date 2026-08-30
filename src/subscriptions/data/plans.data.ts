@@ -32,34 +32,90 @@ export const plansData = [
   },
 ];
 
-// Prices per currency (applied to each plan)
-// stripePriceId: Create recurring prices in Stripe Dashboard (Products > Add Price)
-// paystackPlanCode: Create plans in Paystack Dashboard (Plans > Create Plan)
 export interface PlanPriceData {
   amount: number;
 }
 
-// Base prices per currency — amounts are the same across exam types,
-// but Paystack plan codes MUST be unique per exam type (each exam type
-// gets its own set of plans in Paystack). Stripe price IDs will also
-// need to be unique per exam type when set up.
+// Base prices per currency — used by migration 003 as defaults.
+// Per-exam-type amounts are set by migration 007.
 export const planPricesData: Record<Currency, PlanPriceData[]> = {
   // [1-month, 2-month, 4-month, 6-month]
-  [Currency.NGN]: [{ amount: 2000 }, { amount: 3500 }, { amount: 5000 }, { amount: 6500 }],
+  [Currency.NGN]: [
+    { amount: 2000 },
+    { amount: 3500 },
+    { amount: 5000 },
+    { amount: 6500 },
+  ],
   [Currency.USD]: [{ amount: 3 }, { amount: 5 }, { amount: 7 }, { amount: 9 }],
   [Currency.GBP]: [{ amount: 3 }, { amount: 4 }, { amount: 6 }, { amount: 8 }],
   [Currency.EUR]: [{ amount: 3 }, { amount: 5 }, { amount: 7 }, { amount: 9 }],
-  [Currency.CAD]: [{ amount: 4 }, { amount: 7 }, { amount: 10 }, { amount: 13 }],
-  [Currency.AUD]: [{ amount: 5 }, { amount: 8 }, { amount: 11 }, { amount: 14 }],
-  [Currency.GHS]: [{ amount: 45 }, { amount: 75 }, { amount: 105 }, { amount: 135 }],
-  [Currency.GMD]: [{ amount: 200 }, { amount: 350 }, { amount: 490 }, { amount: 630 }],
+  [Currency.CAD]: [
+    { amount: 4 },
+    { amount: 7 },
+    { amount: 10 },
+    { amount: 13 },
+  ],
+  [Currency.AUD]: [
+    { amount: 5 },
+    { amount: 8 },
+    { amount: 11 },
+    { amount: 14 },
+  ],
+  [Currency.GHS]: [
+    { amount: 45 },
+    { amount: 75 },
+    { amount: 105 },
+    { amount: 135 },
+  ],
+  [Currency.GMD]: [
+    { amount: 200 },
+    { amount: 350 },
+    { amount: 490 },
+    { amount: 630 },
+  ],
   // New currencies — amounts are placeholders; set real values via Admin panel
-  [Currency.ZAR]: [{ amount: 60 }, { amount: 100 }, { amount: 140 }, { amount: 180 }],
-  [Currency.KES]: [{ amount: 400 }, { amount: 700 }, { amount: 1000 }, { amount: 1300 }],
-  [Currency.UGX]: [{ amount: 11000 }, { amount: 19000 }, { amount: 27000 }, { amount: 35000 }],
-  [Currency.TZS]: [{ amount: 7500 }, { amount: 13000 }, { amount: 18500 }, { amount: 24000 }],
-  [Currency.XOF]: [{ amount: 2000 }, { amount: 3500 }, { amount: 5000 }, { amount: 6500 }],
-  [Currency.XAF]: [{ amount: 2000 }, { amount: 3500 }, { amount: 5000 }, { amount: 6500 }],
+  [Currency.ZAR]: [
+    { amount: 60 },
+    { amount: 100 },
+    { amount: 140 },
+    { amount: 180 },
+  ],
+  [Currency.KES]: [
+    { amount: 400 },
+    { amount: 700 },
+    { amount: 1000 },
+    { amount: 1300 },
+  ],
+  [Currency.UGX]: [
+    { amount: 11000 },
+    { amount: 19000 },
+    { amount: 27000 },
+    { amount: 35000 },
+  ],
+  [Currency.TZS]: [
+    { amount: 7500 },
+    { amount: 13000 },
+    { amount: 18500 },
+    { amount: 24000 },
+  ],
+  [Currency.XOF]: [
+    { amount: 2000 },
+    { amount: 3500 },
+    { amount: 5000 },
+    { amount: 6500 },
+  ],
+  [Currency.XAF]: [
+    { amount: 2000 },
+    { amount: 3500 },
+    { amount: 5000 },
+    { amount: 6500 },
+  ],
+  // New African currencies — set real amounts via Admin panel
+  [Currency.LRD]: [],
+  [Currency.SLE]: [],
+  [Currency.CDF]: [],
+  [Currency.MZN]: [],
+  [Currency.NAD]: [],
 };
 
 /**

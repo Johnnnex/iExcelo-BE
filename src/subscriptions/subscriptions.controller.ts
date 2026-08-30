@@ -522,7 +522,6 @@ export class SubscriptionsController {
       link = await this.subscriptionsService.getStripeManageLink(
         subscription.providerCustomerId,
         `${baseUrl}/student/settings/billing`,
-        subscription.providerSubscriptionId ?? undefined,
       );
     }
 
@@ -687,7 +686,7 @@ export class SubscriptionsController {
         )
       : null;
 
-    if (!planPrice || !paystackProvider?.paystackPlanCode) {
+    if (!planPrice || !paystackProvider?.externalId) {
       throw new BadRequestException('Plan not available for your currency');
     }
 
@@ -706,7 +705,7 @@ export class SubscriptionsController {
     // Create new Paystack subscription with same plan (old one is already disabled)
     const newSub = await this.subscriptionsService.createPaystackSubscription({
       customerCode: subscription.providerCustomerId,
-      planCode: paystackProvider.paystackPlanCode,
+      planCode: paystackProvider.externalId,
       authorizationCode: authCode,
     });
 
@@ -799,7 +798,7 @@ export class SubscriptionsController {
           )
         : null;
 
-      if (!targetProvider?.stripePriceId) {
+      if (!targetProvider?.externalId) {
         throw new BadRequestException(
           'Target plan not configured for Stripe. Please contact support.',
         );
@@ -807,7 +806,7 @@ export class SubscriptionsController {
 
       await this.subscriptionsService.upgradeStripeSubscription(
         subscription.providerSubscriptionId,
-        targetProvider.stripePriceId,
+        targetProvider.externalId,
         dto.targetPlanId,
         targetPrice!.id,
       );
@@ -846,7 +845,7 @@ export class SubscriptionsController {
         )
       : null;
 
-    if (!targetPrice || !targetPaystackProvider?.paystackPlanCode) {
+    if (!targetPrice || !targetPaystackProvider?.externalId) {
       throw new BadRequestException(
         'Target plan not available for your currency',
       );
@@ -879,7 +878,7 @@ export class SubscriptionsController {
     // 3. Create new subscription at Paystack (now that old one is disabled)
     const newSub = await this.subscriptionsService.createPaystackSubscription({
       customerCode: subscription.providerCustomerId,
-      planCode: targetPaystackProvider.paystackPlanCode,
+      planCode: targetPaystackProvider.externalId,
       authorizationCode: authCode,
     });
 

@@ -268,13 +268,23 @@ export class AdminExamRevisionService {
     return { items, total, page: opts.page, limit: opts.limit };
   }
 
-  createTopic(dto: { subjectId: string; name: string; content?: string; contentFormat?: 'markdown' | 'plate' }) {
+  createTopic(dto: {
+    subjectId: string;
+    name: string;
+    content?: string;
+    contentFormat?: 'markdown' | 'plate';
+  }) {
     return this.topicRepo.save(this.topicRepo.create(dto));
   }
 
   async updateTopic(
     id: string,
-    dto: Partial<{ name: string; content: string; isActive: boolean; contentFormat: 'markdown' | 'plate' }>,
+    dto: Partial<{
+      name: string;
+      content: string;
+      isActive: boolean;
+      contentFormat: 'markdown' | 'plate';
+    }>,
   ) {
     const t = await this.topicRepo.findOne({ where: { id } });
     if (!t) throw new NotFoundException('Topic not found');
@@ -473,7 +483,12 @@ export class AdminExamRevisionService {
     category: string;
     difficulty: string;
     marks?: number;
-    options?: Array<{ id: string; text: string; isCorrect: boolean }>;
+    options?: Array<{
+      id: string;
+      text: string;
+      contentFormat?: 'markdown' | 'plate';
+      isCorrect: boolean;
+    }>;
     correctAnswer?: any;
     explanation?: string;
     topicId?: string;

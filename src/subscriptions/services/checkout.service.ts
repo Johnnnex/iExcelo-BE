@@ -82,7 +82,7 @@ export class CheckoutService {
       where: { planPriceId: price.id, provider: data.provider, isActive: true },
     });
 
-    const stripePriceId = providerConfig?.stripePriceId ?? null;
+    const externalId = providerConfig?.externalId ?? null;
 
     const subscription = await this.subscriptionsService.createSubscription({
       studentId: data.studentId,
@@ -96,25 +96,24 @@ export class CheckoutService {
 
     // Build line items — prefer a pre-configured Stripe Price ID so that
     // Stripe can match events back to a known price and avoid orphan Price objects.
-    const lineItem: Stripe.Checkout.SessionCreateParams.LineItem =
-      stripePriceId
-        ? { price: stripePriceId, quantity: 1 }
-        : {
-            price_data: {
-              currency: data.currency.toLowerCase(),
-              product_data: {
-                name: `iExcelo - ${plan.name}`,
-                description:
-                  plan.description || `${plan.durationDays} days access`,
-              },
-              unit_amount: Math.round(price.amount * 100),
-              recurring: {
-                interval: 'day',
-                interval_count: plan.durationDays,
-              },
+    const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = externalId
+      ? { price: externalId, quantity: 1 }
+      : {
+          price_data: {
+            currency: data.currency.toLowerCase(),
+            product_data: {
+              name: `iExcelo - ${plan.name}`,
+              description:
+                plan.description || `${plan.durationDays} days access`,
             },
-            quantity: 1,
-          };
+            unit_amount: Math.round(price.amount * 100),
+            recurring: {
+              interval: 'day',
+              interval_count: plan.durationDays,
+            },
+          },
+          quantity: 1,
+        };
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
@@ -221,9 +220,9 @@ export class CheckoutService {
       where: { planPriceId: price.id, provider: data.provider, isActive: true },
     });
 
-    const paystackPlanCode = providerConfig?.paystackPlanCode ?? null;
+    const externalPlanCode = providerConfig?.externalId ?? null;
 
-    if (!paystackPlanCode) {
+    if (!externalPlanCode) {
       throw new BadRequestException(
         'Paystack plan not configured for this price. Please set up the plan in Paystack dashboard.',
       );
@@ -260,7 +259,7 @@ export class CheckoutService {
           email: data.customerEmail,
           amount: Math.round(price.amount * 100), // Paystack uses kobo (overridden by plan amount)
           currency: data.currency,
-          plan: paystackPlanCode,
+          plan: externalPlanCode,
           callback_url: data.successUrl,
           metadata: {
             subscriptionId: subscription.id,

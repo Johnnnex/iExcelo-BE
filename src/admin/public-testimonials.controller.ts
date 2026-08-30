@@ -17,7 +17,15 @@ export class PublicTestimonialsController {
     return this.testimonialRepo.find({
       where: { isPublished: true },
       order: { displayOrder: 'ASC', createdAt: 'DESC' },
-      select: ['id', 'name', 'role', 'content', 'rating', 'displayOrder', 'createdAt'],
+      select: [
+        'id',
+        'name',
+        'role',
+        'content',
+        'rating',
+        'displayOrder',
+        'createdAt',
+      ],
     });
   }
 }
