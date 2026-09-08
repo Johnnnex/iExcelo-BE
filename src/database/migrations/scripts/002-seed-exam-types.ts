@@ -44,6 +44,7 @@ export const migration002: IMigration = {
           supportedCategories: data.supportedCategories,
           minSubjectsSelectable: data.minSubjectsSelectable,
           maxSubjectsSelectable: data.maxSubjectsSelectable,
+          isActive: data.isActive,
         });
       }
       examTypeMap.set(data.name, et);
@@ -62,6 +63,31 @@ export const migration002: IMigration = {
         .where('ets.examTypeId = :etId', { etId: examType.id })
         .andWhere('s.name = :name', { name: data.name })
         .getOne();
+
+      // skipEts: subject is seeded but NOT linked to this exam type
+      if ((data as any).skipEts) {
+        // Ensure the Subject exists but skip (and remove) any ETS link
+        let subject = await subjectRepo
+          .createQueryBuilder('s')
+          .where('s.name ILIKE :name', { name: data.name })
+          .getOne();
+        if (!subject) {
+          subject = await subjectRepo.save(
+            subjectRepo.create({
+              name: data.name,
+              description: data.description,
+              isAlsoPractical: data.isAlsoPractical,
+            }),
+          );
+          console.log(`      + Subject (no ETS): ${data.name}`);
+        }
+        // Remove any stale ETS link that might exist
+        if (existingEts) {
+          await etsRepo.remove(existingEts);
+          console.log(`      - Removed ETS: ${data.examTypeName} / ${data.name}`);
+        }
+        continue;
+      }
 
       if (existingEts) {
         // Keep isCompulsory in sync on re-runs

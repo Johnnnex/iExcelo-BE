@@ -435,7 +435,8 @@ export class ExamsService {
       });
     }
 
-    const totalAttempted = correctAnswers + wrongAnswers;
+    // Include essays (practical/theory) in attempted count; they are submitted answers even if not auto-graded
+    const totalAttempted = correctAnswers + wrongAnswers + essayCount;
     // Unanswered = total questions minus ALL non-empty responses submitted
     const unanswered =
       examAttempt.totalQuestions - dto.questionResponses.length;

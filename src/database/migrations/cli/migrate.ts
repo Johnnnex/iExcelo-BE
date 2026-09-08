@@ -60,6 +60,9 @@ import { migration006 } from '../scripts/006-seed-role-templates';
 import { migration007 } from '../scripts/007-per-exam-type-plan-prices';
 import { migration008 } from '../scripts/008-stripe-price-ids';
 import { migration009 } from '../scripts/009-paystack-plan-ids';
+import { migration010 } from '../scripts/010-plan-badge-perks';
+import { migration011 } from '../scripts/011-commission-confirmed-status';
+import { migration012 } from '../scripts/012-disable-post-jamb-sat';
 
 const ALL_MIGRATIONS = [
   migration001,
@@ -71,6 +74,9 @@ const ALL_MIGRATIONS = [
   migration007,
   migration008,
   migration009,
+  migration010,
+  migration011,
+  migration012,
 ];
 
 async function createDataSource(): Promise<DataSource> {

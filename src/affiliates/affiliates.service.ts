@@ -322,7 +322,7 @@ export class AffiliatesService {
         .select('COALESCE(SUM(c.amount), 0)', 'total')
         .where('c.affiliateId = :affiliateId', { affiliateId: profile.id })
         .andWhere('c.currency = :currency', { currency })
-        .andWhere('c.status = :status', { status: CommissionStatus.PENDING })
+        .andWhere('c.status = :status', { status: CommissionStatus.CONFIRMED })
         .getRawOne<{ total: string }>();
       pendingBalance = parseFloat(pendingResult?.total || '0');
 
@@ -350,7 +350,7 @@ export class AffiliatesService {
         .createQueryBuilder('c')
         .select('COALESCE(SUM(c.amount), 0)', 'total')
         .where('c.affiliateId = :affiliateId', { affiliateId: profile.id })
-        .andWhere('c.status = :status', { status: CommissionStatus.PENDING })
+        .andWhere('c.status = :status', { status: CommissionStatus.CONFIRMED })
         .getRawOne<{ total: string }>();
       pendingBalance = parseFloat(pendingResult?.total || '0');
 
@@ -771,7 +771,7 @@ export class AffiliatesService {
       .select('COALESCE(SUM(c.amount), 0)', 'total')
       .where('c.affiliateId = :affiliateId', { affiliateId })
       .andWhere('c.currency = :currency', { currency })
-      .andWhere('c.status = :status', { status: CommissionStatus.PENDING })
+      .andWhere('c.status = :status', { status: CommissionStatus.CONFIRMED })
       .getRawOne<{ total: string }>();
     const pendingCommissions = parseFloat(
       pendingCommissionsResult?.total || '0',

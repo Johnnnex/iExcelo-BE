@@ -30,7 +30,13 @@ export class SubscriptionPlan extends BaseEntity {
   isActive: boolean;
 
   @Column({ default: 0 })
-  sortOrder: number; // For ordering plans in UI
+  sortOrder: number;
+
+  @Column({ type: 'text', nullable: true })
+  badge: string; // e.g. "Starter", "Most Popular", "Best Value" — null = no badge
+
+  @Column({ type: 'jsonb', default: [] })
+  perks: string[]; // list of feature bullets shown on the plan card
 
   // Relations
   @ManyToOne(() => ExamType, { onDelete: 'CASCADE' })

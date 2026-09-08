@@ -8,13 +8,26 @@ export const plansData = [
     durationDays: 30,
     sortOrder: 1,
     badge: 'Starter',
+    perks: [
+      'Access to full question bank',
+      'Unlimited revision sessions',
+      'Instant answer explanations',
+      'Performance tracking dashboard',
+    ],
   },
   {
     name: '2-Month Plan',
     description: 'Perfect for short-term exam preparation',
     durationDays: 60,
     sortOrder: 2,
-    badge: null,
+    badge: null as string | null,
+    perks: [
+      'Access to full question bank',
+      'Unlimited revision sessions',
+      'Instant answer explanations',
+      'Performance tracking dashboard',
+      'Topic-by-topic progress tracking',
+    ],
   },
   {
     name: '4-Month Plan',
@@ -22,6 +35,14 @@ export const plansData = [
     durationDays: 120,
     sortOrder: 3,
     badge: 'Most Popular',
+    perks: [
+      'Access to full question bank',
+      'Unlimited revision and mock tests',
+      'Instant answer explanations',
+      'Performance tracking dashboard',
+      'Topic-by-topic progress tracking',
+      'Timed mock exam practice',
+    ],
   },
   {
     name: '6-Month Plan',
@@ -29,6 +50,15 @@ export const plansData = [
     durationDays: 180,
     sortOrder: 4,
     badge: 'Best Value',
+    perks: [
+      'Access to full question bank',
+      'Unlimited revision and mock tests',
+      'Instant answer explanations',
+      'Performance tracking dashboard',
+      'Topic-by-topic progress tracking',
+      'Timed mock exam practice',
+      'Priority support access',
+    ],
   },
 ];
 
@@ -142,16 +172,16 @@ export const paystackPlanCodes: Record<
   // Index 0 (1-month) is new — create these plans in Paystack Dashboard and fill in codes
   JAMB: {
     [Currency.NGN]: [
-      '', // 1-month 2000 NGN — TODO: create in Paystack and fill in
-      'PLN_qywk2astce6ycjc', // 2-month 3500 NGN
-      'PLN_pf590r2204z65fc', // 4-month 5000 NGN
-      'PLN_563tpi844nnugeh', // 6-month 6500 NGN
+      '', // 1-month — fill in after running paystack-seed-plans.ts
+      '', // 2-month — Paystack has no 2-month interval; intentionally empty
+      'PLN_pf590r2204z65fc', // 4-month
+      'PLN_563tpi844nnugeh', // 6-month
     ],
   },
   WAEC: {
     [Currency.NGN]: [
       '',
-      'PLN_fepvq6ihqumq1zl',
+      '', // 2-month — Paystack has no 2-month interval; intentionally empty
       'PLN_7dyq8pj4rfzq2ke',
       'PLN_x8hmg1hnz2rox8h',
     ],
@@ -159,7 +189,7 @@ export const paystackPlanCodes: Record<
   NECO: {
     [Currency.NGN]: [
       '',
-      'PLN_a1tbyioqg0xqjv0',
+      '', // 2-month — Paystack has no 2-month interval; intentionally empty
       'PLN_lu5y6472yl7ipfy',
       'PLN_u2h536obyswnkkx',
     ],
@@ -167,7 +197,7 @@ export const paystackPlanCodes: Record<
   'POST-JAMB': {
     [Currency.NGN]: [
       '',
-      'PLN_ilf8cfnyv7d7wgz',
+      '', // 2-month — Paystack has no 2-month interval; intentionally empty
       'PLN_oc2a8sodbz3x14s',
       'PLN_ngpzgou16yiukvr',
     ],
@@ -175,7 +205,7 @@ export const paystackPlanCodes: Record<
   GCE: {
     [Currency.NGN]: [
       '',
-      'PLN_iijt2c8hbubnzz2',
+      '', // 2-month — Paystack has no 2-month interval; intentionally empty
       'PLN_igvcrw57pww8vu6',
       'PLN_z1koi95l5f1jwu1',
     ],
@@ -183,7 +213,7 @@ export const paystackPlanCodes: Record<
   SAT: {
     [Currency.NGN]: [
       '',
-      'PLN_p74c6i6v2kn5j7o',
+      '', // 2-month — Paystack has no 2-month interval; intentionally empty
       'PLN_0m4xkpcei0yjasy',
       'PLN_2kt0zl47ow4rphk',
     ],

@@ -112,7 +112,7 @@ export function getWelcomeEmailTemplate(params: {
 
     <p class="body-sub" style="margin:0 0 28px;font-size:14px;color:#667085;text-align:center;line-height:1.6;">
       Questions? Email us anytime at
-      <a href="mailto:support@iexcelo.com" style="color:${accentColor};text-decoration:none;">support@iexcelo.com</a>
+      <a href="mailto:platform@iexcelo.com" style="color:${accentColor};text-decoration:none;">platform@iexcelo.com</a>
     </p>
 
     ${signoff()}

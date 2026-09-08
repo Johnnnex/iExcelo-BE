@@ -402,12 +402,15 @@ export const subjectsData = [
   },
 
   // ── POST-JAMB Subjects ───────────────────────────────────────────────────────
+  // skipEts: true — subjects are seeded but NOT linked to this exam type until
+  // questions are available and wired from the admin dashboard.
   {
     name: 'English Language',
     examTypeName: 'POST-JAMB',
     description: 'Compulsory subject',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
   {
     name: 'Mathematics',
@@ -415,6 +418,7 @@ export const subjectsData = [
     description: 'Core subject',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
   {
     name: 'Physics',
@@ -422,6 +426,7 @@ export const subjectsData = [
     description: 'Science subject',
     isCompulsory: false,
     isAlsoPractical: true,
+    skipEts: true,
   },
   {
     name: 'Chemistry',
@@ -429,6 +434,7 @@ export const subjectsData = [
     description: 'Science subject',
     isCompulsory: false,
     isAlsoPractical: true,
+    skipEts: true,
   },
   {
     name: 'Biology',
@@ -436,6 +442,7 @@ export const subjectsData = [
     description: 'Life sciences',
     isCompulsory: false,
     isAlsoPractical: true,
+    skipEts: true,
   },
   {
     name: 'Economics',
@@ -443,6 +450,7 @@ export const subjectsData = [
     description: 'Social sciences',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
   {
     name: 'Government',
@@ -450,6 +458,7 @@ export const subjectsData = [
     description: 'Political science',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
   {
     name: 'Literature in English',
@@ -457,6 +466,7 @@ export const subjectsData = [
     description: 'Arts subject',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
   {
     name: 'Commerce',
@@ -464,6 +474,7 @@ export const subjectsData = [
     description: 'Business subject',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
   {
     name: 'Accounting',
@@ -471,6 +482,7 @@ export const subjectsData = [
     description: 'Finance subject',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
 
   // ── GCE Subjects ─────────────────────────────────────────────────────────────
@@ -624,12 +636,14 @@ export const subjectsData = [
   },
 
   // ── SAT Subjects ─────────────────────────────────────────────────────────────
+  // skipEts: true — subjects seeded but NOT linked until questions are available.
   {
     name: 'Evidence-Based Reading and Writing',
     examTypeName: 'SAT',
     description: 'Critical reading and writing skills',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
   {
     name: 'Mathematics',
@@ -637,6 +651,7 @@ export const subjectsData = [
     description: 'Algebra, geometry, and data analysis',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
   {
     name: 'Essay (Optional)',
@@ -644,5 +659,6 @@ export const subjectsData = [
     description: 'Analytical writing assessment',
     isCompulsory: false,
     isAlsoPractical: false,
+    skipEts: true,
   },
 ];

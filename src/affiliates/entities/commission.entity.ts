@@ -23,7 +23,7 @@ export class Commission extends BaseEntity {
   @Column({
     type: 'enum',
     enum: Object.values(CommissionStatus),
-    default: CommissionStatus.PENDING,
+    default: CommissionStatus.CONFIRMED,
   })
   status: CommissionStatus;
 

@@ -59,7 +59,7 @@ export const examTypesData = [
     freeTierQuestionLimit: 20,
     supportedCategories: [QuestionCategory.OBJECTIVES],
     practicalSubjectNames: [] as string[],
-    isActive: true,
+    isActive: false, // Disabled until questions are available
   },
   {
     name: 'GCE',
@@ -85,6 +85,6 @@ export const examTypesData = [
     freeTierQuestionLimit: 15,
     supportedCategories: [QuestionCategory.OBJECTIVES],
     practicalSubjectNames: [] as string[],
-    isActive: true,
+    isActive: false, // Disabled until questions are available
   },
 ];

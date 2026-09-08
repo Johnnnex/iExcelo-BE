@@ -23,11 +23,11 @@ const JAMB_PRICES: Partial<Record<Currency, [number, number, number, number]>> =
     [Currency.KES]: [750, 1250, 1850, 3600],
     [Currency.MZN]: [400, 650, 950, 1250],
     [Currency.NAD]: [95, 160, 260, 400],
-    [Currency.USD]: [14.99, 20.99, 29.99, 44.99],
-    [Currency.GBP]: [14.99, 20.99, 29.99, 44.99],
+    [Currency.USD]: [14.99, 19.99, 29.99, 44.99],
+    [Currency.GBP]: [14.99, 19.99, 29.99, 44.99],
     [Currency.CAD]: [19.99, 29.99, 39.99, 59.99],
-    [Currency.AUD]: [14.99, 20.99, 29.99, 44.99],
-    [Currency.EUR]: [14.99, 20.99, 29.99, 44.99],
+    [Currency.AUD]: [14.99, 19.99, 29.99, 44.99],
+    [Currency.EUR]: [14.99, 19.99, 29.99, 44.99],
   };
 
 // WAEC, GCE, NECO share the same pricing
@@ -48,11 +48,11 @@ const WAEC_GCE_NECO_PRICES: Partial<
   [Currency.KES]: [650, 1150, 1750, 3500],
   [Currency.MZN]: [350, 550, 850, 1150],
   [Currency.NAD]: [85, 150, 250, 400],
-  [Currency.USD]: [10, 15.99, 24.99, 39.99],
-  [Currency.GBP]: [9.99, 15.99, 24.99, 39.99],
+  [Currency.USD]: [10, 14.99, 24.99, 39.99],
+  [Currency.GBP]: [9.99, 14.99, 24.99, 39.99],
   [Currency.CAD]: [14.99, 24.99, 34.99, 54.99],
-  [Currency.AUD]: [9.99, 15.99, 24.99, 39.99],
-  [Currency.EUR]: [9.99, 15.99, 24.99, 39.99],
+  [Currency.AUD]: [9.99, 14.99, 24.99, 39.99],
+  [Currency.EUR]: [9.99, 14.99, 24.99, 39.99],
 };
 
 const PLAN_NAMES = [

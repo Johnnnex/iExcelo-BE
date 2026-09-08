@@ -113,6 +113,7 @@ export class AdminSubscriptionsService {
     if (sub.status === SubscriptionStatus.CANCELLED) {
       throw new BadRequestException('Already cancelled');
     }
+    // Allow cancellation of any status including EXPIRED (admin override)
     sub.status = SubscriptionStatus.CANCELLED;
     sub.cancelledAt = new Date();
     await this.subscriptionRepo.save(sub);
@@ -161,6 +162,8 @@ export class AdminSubscriptionsService {
     description?: string;
     durationDays: number;
     sortOrder?: number;
+    badge?: string | null;
+    perks?: string[];
     prices?: Array<{
       currency: string;
       amount: number;
@@ -180,6 +183,8 @@ export class AdminSubscriptionsService {
     const plan = await this.planRepo.save(
       this.planRepo.create({
         ...planData,
+        badge: planData.badge as string,
+        perks: planData.perks ?? [],
         isActive: true,
         sortOrder: planData.sortOrder ?? 0,
       }),
@@ -198,6 +203,8 @@ export class AdminSubscriptionsService {
       description?: string;
       durationDays?: number;
       sortOrder?: number;
+      badge?: string | null;
+      perks?: string[];
       isActive?: boolean;
       prices?: Array<{
         currency: string;

@@ -1424,9 +1424,14 @@ export class SubscriptionsService {
       };
     });
 
+    // Drop plans that have no price in the detected currency OR no active providers
+    const filteredPlans = plansWithPrices.filter(
+      (p) => p.planPriceId && p.providers.length > 0,
+    );
+
     return {
       currency,
-      plans: plansWithPrices,
+      plans: filteredPlans,
     };
   }
 
