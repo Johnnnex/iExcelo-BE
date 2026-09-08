@@ -452,9 +452,10 @@ export class AdminExamRevisionController {
   @Post('questions')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
   createQuestion(
+    @Request() req: { user: { sub: string } },
     @Body() body: Parameters<AdminExamRevisionService['createQuestion']>[0],
   ) {
-    return this.examRevision.createQuestion(body);
+    return this.examRevision.createQuestion(body, req.user.sub);
   }
 
   @Patch('questions/:id')
@@ -477,8 +478,11 @@ export class AdminExamRevisionController {
 
   @Post('questions/bulk-import')
   @AdminAccess(AdminModule.EXAM_REVISION, 'write')
-  bulkImport(@Body() body: { questions: Array<Record<string, unknown>> }) {
-    return this.examRevision.bulkImportQuestions(body.questions);
+  bulkImport(
+    @Request() req: { user: { sub: string } },
+    @Body() body: { questions: Array<Record<string, unknown>> },
+  ) {
+    return this.examRevision.bulkImportQuestions(body.questions, req.user.sub);
   }
 
   @Get('questions/csv-template')

@@ -158,7 +158,7 @@ export enum PaymentStatus {
 }
 
 export enum CommissionStatus {
-  CONFIRMED = 'confirmed', // Subscription activated — commission is earned and awaiting payout
+  CONFIRMED = 'confirmed',
   PAID = 'paid',
 }
 

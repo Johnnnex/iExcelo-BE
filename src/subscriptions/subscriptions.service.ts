@@ -23,17 +23,14 @@ import {
   PlanPriceProvider,
   RegionCurrency,
 } from './entities';
-import { User } from '../users/entities/user.entity';
 import { StudentsService } from '../students/students.service';
-import { ExamType } from '../exams/entities/exam-type.entity';
-import { Giveback } from '../sponsors/entities/giveback.entity';
 import { LoggerService } from '../logger/logger.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AffiliatesService } from '../affiliates/affiliates.service';
-import { plansData, planPricesData, paystackPlanCodes } from './data';
+import { ExamsService } from '../exams/exams.service';
+import { UsersService } from '../users/users.service';
 import {
   SubscriptionStatus,
-  GivebackStatus,
   PaymentProvider,
   Currency,
   LogActionTypes,
@@ -63,87 +60,13 @@ export class SubscriptionsService {
     private analyticsService: AnalyticsService,
     @InjectQueue(ANALYTICS_QUEUE) private readonly analyticsQueue: Queue,
     private affiliatesService: AffiliatesService,
+    private examsService: ExamsService,
+    private usersService: UsersService,
     @Inject(forwardRef(() => StudentsService))
     private readonly studentsService: StudentsService,
   ) {
     const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     if (stripeKey) this.stripe = new Stripe(stripeKey);
-  }
-
-  /**
-   * Creates subscription plans and prices for all active exam types.
-   * Returns count of created records.
-   */
-  private async createPlansForAllExamTypes(): Promise<{
-    plansCreated: number;
-    pricesCreated: number;
-  }> {
-    let plansCreated = 0;
-    let pricesCreated = 0;
-
-    // Get all exam types
-    const examTypeRepo = this.subscriptionRepo.manager.getRepository(ExamType);
-    const examTypes = await examTypeRepo.find({ where: { isActive: true } });
-
-    if (examTypes.length === 0) {
-      this.logger.warn(
-        'No active exam types found - cannot seed subscription plans',
-      );
-      return { plansCreated: 0, pricesCreated: 0 };
-    }
-
-    // Create plans for each exam type
-    for (const examType of examTypes) {
-      // Look up per-exam-type Paystack plan codes
-      const examPlanCodes = paystackPlanCodes[examType.name] || {};
-
-      for (const planData of plansData) {
-        const plan = this.planRepo.create({
-          examTypeId: examType.id,
-          name: planData.name,
-          description: planData.description,
-          durationDays: planData.durationDays,
-          sortOrder: planData.sortOrder,
-          isActive: true,
-        });
-        const savedPlan = await this.planRepo.save(plan);
-        plansCreated++;
-
-        // Create prices for each currency with provider-specific IDs
-        const priceIndex = planData.sortOrder - 1; // 0, 1, 2
-        const currencies = Object.keys(planPricesData) as Currency[];
-        for (const currency of currencies) {
-          const priceData = planPricesData[currency][priceIndex];
-
-          const price = await this.planPriceRepo.save(
-            this.planPriceRepo.create({
-              planId: savedPlan.id,
-              currency,
-              amount: priceData.amount,
-              isActive: true,
-            }),
-          );
-          pricesCreated++;
-
-          const paystackCode = examPlanCodes[currency]?.[priceIndex];
-          if (paystackCode) {
-            await this.planPriceProviderRepo.save(
-              this.planPriceProviderRepo.create({
-                planPriceId: price.id,
-                provider: PaymentProvider.PAYSTACK,
-                externalId: paystackCode,
-                isActive: true,
-              }),
-            );
-          }
-        }
-      }
-    }
-
-    this.logger.log(
-      `Seeded ${plansCreated} subscription plans with ${pricesCreated} prices for ${examTypes.length} exam types`,
-    );
-    return { plansCreated, pricesCreated };
   }
 
   /**
@@ -215,46 +138,6 @@ export class SubscriptionsService {
     subscription.providerCustomerId = providerCustomerId;
     await this.subscriptionRepo.save(subscription);
     return true;
-  }
-
-  /**
-   * Activate all PENDING subscriptions linked to a sponsor giveback.
-   * Used as a webhook safety net in case the sponsor's browser never called verify.
-   * Returns the number of subscriptions successfully activated.
-   */
-  async activateGivebackSubscriptions(givebackId: string): Promise<number> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-    const giveback = await givebackRepo.findOne({ where: { id: givebackId } });
-    if (!giveback) return 0;
-
-    // Idempotency — already active
-    if (giveback.status === GivebackStatus.ACTIVE) {
-      const existing = await this.findSubscriptionsByGivebackId(givebackId);
-      return existing.length;
-    }
-
-    const subscriptions = await this.findSubscriptionsByGivebackId(givebackId);
-    let count = 0;
-    for (const sub of subscriptions) {
-      try {
-        await this.activateSubscription(sub.id);
-        count++;
-      } catch {
-        // Don't fail the whole batch for one student
-      }
-    }
-
-    const firstActivated =
-      await this.findFirstActivatedSubForGiveback(givebackId);
-    await givebackRepo.update(
-      { id: givebackId },
-      {
-        status: GivebackStatus.ACTIVE,
-        ...(firstActivated?.endDate ? { endDate: firstActivated.endDate } : {}),
-      },
-    );
-
-    return count;
   }
 
   /**
@@ -382,9 +265,7 @@ export class SubscriptionsService {
             referral.affiliateId,
           );
           if (affiliateProfile) {
-            const affiliateUser = await this.subscriptionRepo.manager
-              .getRepository(User)
-              .findOne({ where: { id: affiliateProfile.userId } });
+            const affiliateUser = await this.usersService.findById(affiliateProfile.userId);
 
             if (affiliateUser && affiliateUser.role !== UserType.SPONSOR) {
               // If affiliate is a student, they must have subscribed before to earn commissions
@@ -827,161 +708,66 @@ export class SubscriptionsService {
     return { subscriptions, total };
   }
 
-  /** Stats for the Giveback History page cards. */
-  async getGivebackPageStats(sponsorId: string): Promise<{
-    totalSpent: number;
-    totalGivebacks: number;
-    thisMonthGivebacks: number;
-    studentsSponsored: number;
-    expiringSoon: number;
-  }> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-    const now = new Date();
-    const thisStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const in10Days = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000);
+  /** Find all subscriptions linked to a giveback. */
+  async findSubscriptionsByGivebackId(
+    givebackId: string,
+    opts?: { includeUser?: boolean },
+  ): Promise<Subscription[]> {
+    const relations = ['plan', 'student', 'examType'];
+    if (opts?.includeUser) relations.push('student.user');
+    return this.subscriptionRepo.find({
+      where: { givebackId },
+      relations,
+      order: { createdAt: 'ASC' },
+    });
+  }
 
-    const allGivebacks = await givebackRepo.find({ where: { sponsorId } });
+  /** Find only ACTIVE subscriptions for a giveback. */
+  async findActiveSubsByGivebackId(
+    givebackId: string,
+    opts?: { includeUser?: boolean; orderByEndDate?: boolean },
+  ): Promise<Subscription[]> {
+    const relations = ['plan', 'examType', 'student'];
+    if (opts?.includeUser) relations.push('student.user');
+    return this.subscriptionRepo.find({
+      where: { givebackId, status: SubscriptionStatus.ACTIVE },
+      relations: relations.length > 0 ? relations : undefined,
+      order: opts?.orderByEndDate ? { endDate: 'ASC' } : { createdAt: 'ASC' },
+    });
+  }
 
-    const totalGivebacks = allGivebacks.length;
+  /** Find first subscription (any status) for a giveback — used for enrichment. */
+  async findFirstSubByGivebackId(
+    givebackId: string,
+  ): Promise<Subscription | null> {
+    return this.subscriptionRepo.findOne({
+      where: { givebackId },
+      relations: ['plan', 'examType'],
+      order: { createdAt: 'ASC' },
+    });
+  }
 
-    const thisMonthGivebacks = allGivebacks.filter(
-      (g) => new Date(g.createdAt) >= thisStart,
-    ).length;
-
-    const givebackIds = allGivebacks.map((g) => g.id);
-
-    if (!givebackIds.length) {
-      return {
-        totalSpent: 0,
-        totalGivebacks,
-        thisMonthGivebacks,
-        studentsSponsored: 0,
-        expiringSoon: 0,
-      };
-    }
-
-    // Only count givebacks where payment was verified (at least one ACTIVE subscription)
-    const paidGivebackIds = await this.subscriptionRepo
+  /** Return givebackIds from the given list that have at least one ACTIVE subscription. */
+  async getActivatedGivebackIds(givebackIds: string[]): Promise<Set<string>> {
+    if (!givebackIds.length) return new Set();
+    const rows = await this.subscriptionRepo
       .createQueryBuilder('s')
       .select('DISTINCT s."givebackId"', 'givebackId')
       .where('s."givebackId" IN (:...givebackIds)', { givebackIds })
       .andWhere('s.status = :status', { status: SubscriptionStatus.ACTIVE })
-      .getRawMany<{ givebackId: string }>()
-      .then((rows) => new Set(rows.map((r) => r.givebackId)))
-      .catch(() => new Set<string>());
+      .getRawMany<{ givebackId: string }>();
+    return new Set(rows.map((r) => r.givebackId));
+  }
 
-    const totalSpent = allGivebacks
-      .filter((g) => paidGivebackIds.has(g.id))
-      .reduce((sum, g) => sum + (g.amount ?? 0), 0);
-
-    // Count distinct students ever sponsored (deduplicated across multiple givebacks)
-    const studentsSponsored = await this.subscriptionRepo
+  /** Count distinct students sponsored across the given givebackIds. */
+  async countSponsoredStudentsByGivebacks(givebackIds: string[]): Promise<number> {
+    if (!givebackIds.length) return 0;
+    const row = await this.subscriptionRepo
       .createQueryBuilder('s')
       .select('COUNT(DISTINCT s."studentId")', 'count')
       .where('s."givebackId" IN (:...givebackIds)', { givebackIds })
-      .getRawOne<{ count: string }>()
-      .then((r) => parseInt(r?.count ?? '0', 10))
-      .catch(() => 0);
-
-    // Count givebacks expiring within 10 days that haven't been resubbed yet
-    // Uses giveback.status + endDate directly — set when payment is verified (no join needed)
-    const expiringSoon = await givebackRepo
-      .createQueryBuilder('g')
-      .where('g.id IN (:...givebackIds)', { givebackIds })
-      .andWhere('g.status = :gStatus', { gStatus: GivebackStatus.ACTIVE })
-      .andWhere('g."endDate" BETWEEN :now AND :in10Days', { now, in10Days })
-      .andWhere('g."hasResubbed" = false')
-      .getCount()
-      .catch(() => 0);
-
-    return {
-      totalSpent,
-      totalGivebacks,
-      thisMonthGivebacks,
-      studentsSponsored,
-      expiringSoon,
-    };
-  }
-
-  /** Paginated giveback history for sponsor, each row enriched with first linked subscription summary. */
-  async getSponsoredGivebacks(
-    sponsorId: string,
-    page: number,
-    limit: number,
-    status?: GivebackStatus,
-  ): Promise<{ givebacks: any[]; total: number }> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-
-    // Lazy expiration: mark any of this sponsor's ACTIVE givebacks whose endDate has passed.
-    // Scoped to sponsorId — hits only an indexed subset, not the full table. Fast.
-    await givebackRepo.update(
-      {
-        sponsorId,
-        status: GivebackStatus.ACTIVE,
-        endDate: LessThan(new Date()),
-      },
-      { status: GivebackStatus.EXPIRED },
-    );
-
-    const [givebacks, total] = await givebackRepo.findAndCount({
-      where: { sponsorId, ...(status ? { status } : {}) },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    // Enrich each giveback with first linked subscription (for exam + plan labels)
-    const enriched = await Promise.all(
-      givebacks.map(async (gb) => {
-        const firstSub = await this.subscriptionRepo.findOne({
-          where: { givebackId: gb.id },
-          relations: ['plan', 'examType'],
-          order: { createdAt: 'ASC' },
-        });
-        return { ...gb, subscription: firstSub ?? null };
-      }),
-    );
-
-    return { givebacks: enriched, total };
-  }
-
-  /** Get giveback by id with all linked subscriptions (for detail view). */
-  async getGivebackDetail(
-    sponsorId: string,
-    givebackId: string,
-  ): Promise<{ giveback: Giveback; subscriptions: Subscription[] } | null> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-    const giveback = await givebackRepo.findOne({
-      where: { id: givebackId, sponsorId },
-    });
-    if (!giveback) return null;
-
-    const subscriptions = await this.subscriptionRepo.find({
-      where: { givebackId },
-      relations: ['plan', 'examType', 'student', 'student.user'],
-      order: { createdAt: 'ASC' },
-    });
-
-    return { giveback, subscriptions };
-  }
-
-  /** Find all subscriptions linked to a giveback. */
-  async findSubscriptionsByGivebackId(
-    givebackId: string,
-  ): Promise<Subscription[]> {
-    return this.subscriptionRepo.find({
-      where: { givebackId },
-      relations: ['plan', 'student', 'examType'],
-    });
-  }
-
-  /** Find only ACTIVE subscriptions for a giveback (used during resub to get each student's endDate). */
-  async findActiveSubsByGivebackId(
-    givebackId: string,
-  ): Promise<Subscription[]> {
-    return this.subscriptionRepo.find({
-      where: { givebackId, status: SubscriptionStatus.ACTIVE },
-    });
+      .getRawOne<{ count: string }>();
+    return parseInt(row?.count ?? '0', 10);
   }
 
   /** Get one activated sub for a giveback — used to stamp giveback.endDate after verification. */
@@ -992,40 +778,6 @@ export class SubscriptionsService {
       where: { givebackId, status: SubscriptionStatus.ACTIVE },
       order: { createdAt: 'ASC' },
     });
-  }
-
-  /**
-   * Givebacks with at least one ACTIVE sub expiring within 10 days and hasResubbed = false.
-   * Used to populate the "expiring soon" section on the sponsor giveback page.
-   */
-  async getExpiringSoonGivebacks(sponsorId: string): Promise<any[]> {
-    const givebackRepo = this.subscriptionRepo.manager.getRepository(Giveback);
-    const now = new Date();
-    const in10Days = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000);
-
-    // Direct query on giveback.status + endDate — no join, no derivation
-    const expiringGivebacks = await givebackRepo.find({
-      where: {
-        sponsorId,
-        status: GivebackStatus.ACTIVE,
-        hasResubbed: false,
-        endDate: Between(now, in10Days),
-      },
-      order: { endDate: 'ASC' },
-    });
-
-    if (!expiringGivebacks.length) return [];
-
-    return Promise.all(
-      expiringGivebacks.map(async (gb) => {
-        const subs = await this.subscriptionRepo.find({
-          where: { givebackId: gb.id, status: SubscriptionStatus.ACTIVE },
-          relations: ['plan', 'examType', 'student', 'student.user'],
-          order: { endDate: 'ASC' },
-        });
-        return { ...gb, subscriptions: subs, earliestExpiry: gb.endDate };
-      }),
-    );
   }
 
   /** Delete all PENDING subscriptions linked to a giveback (cleanup on Paystack init failure). */
@@ -1330,9 +1082,7 @@ export class SubscriptionsService {
               referral.affiliateId,
             );
             if (affiliateProfile) {
-              const affiliateUser = await this.subscriptionRepo.manager
-                .getRepository(User)
-                .findOne({ where: { id: affiliateProfile.userId } });
+              const affiliateUser = await this.usersService.findById(affiliateProfile.userId);
 
               if (affiliateUser && affiliateUser.role !== UserType.SPONSOR) {
                 // If affiliate is a student, they must have subscribed before to earn commissions

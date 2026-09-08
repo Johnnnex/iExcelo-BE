@@ -117,6 +117,11 @@ export class Question extends BaseEntity {
   @Column({ nullable: true, unique: true })
   legacyId: string;
 
+  // Admin profile ID of the admin who first created this question (not edited).
+  // Null for questions created before this field was introduced.
+  @Column({ type: 'varchar', nullable: true })
+  createdBy: string | null;
+
   // ─── Relations ────────────────────────────────────────────────────────────
 
   // Many-to-many with ExamTypeSubject — one question can appear in multiple

@@ -1056,4 +1056,29 @@ export class AffiliatesService {
     profile.affiliateCode = newCode;
     return await this.affiliateProfileRepo.save(profile);
   }
+
+  /**
+   * Mark CONFIRMED commissions as PAID when a payout is approved.
+   * Processes oldest commissions first, up to the payout amount.
+   */
+  async markCommissionsAsPaidForPayout(
+    affiliateId: string,
+    currency: Currency,
+    amount: number,
+  ): Promise<void> {
+    const commissions = await this.commissionRepo.find({
+      where: { affiliateId, currency, status: CommissionStatus.CONFIRMED },
+      order: { createdAt: 'ASC' },
+    });
+    let remaining = amount;
+    const toMarkPaid: string[] = [];
+    for (const c of commissions) {
+      if (remaining <= 0) break;
+      toMarkPaid.push(c.id);
+      remaining -= c.amount;
+    }
+    if (toMarkPaid.length > 0) {
+      await this.commissionRepo.update(toMarkPaid, { status: CommissionStatus.PAID });
+    }
+  }
 }

@@ -38,6 +38,7 @@ import { BulkEmailCampaign } from './entities/bulk-email-campaign.entity';
 import { User } from '../users/entities/user.entity';
 import { StudentProfile } from '../students/entities/student-profile.entity';
 import { SponsorProfile } from '../sponsors/entities/sponsor-profile.entity';
+import { AffiliatesModule } from '../affiliates/affiliates.module';
 import { AffiliateProfile } from '../affiliates/entities/affiliate-profile.entity';
 import { AffiliatePayout } from '../affiliates/entities/affiliate-payout.entity';
 import { AffiliatePayoutAccount } from '../affiliates/entities/affiliate-payout-account.entity';
@@ -94,6 +95,8 @@ import { EMAILS_QUEUE } from '../email/queue/email.queue';
       PlatformDailyAnalytics,
       StudentSubjectAnalytics,
     ]),
+
+    AffiliatesModule,
 
     BullModule.registerQueue({ name: EMAILS_QUEUE }),
 

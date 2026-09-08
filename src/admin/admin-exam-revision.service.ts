@@ -476,27 +476,30 @@ export class AdminExamRevisionService {
     }
   }
 
-  async createQuestion(dto: {
-    examTypeSubjectIds: string[];
-    questionText: string;
-    type: string;
-    category: string;
-    difficulty: string;
-    marks?: number;
-    options?: Array<{
-      id: string;
-      text: string;
+  async createQuestion(
+    dto: {
+      examTypeSubjectIds: string[];
+      questionText: string;
+      type: string;
+      category: string;
+      difficulty: string;
+      marks?: number;
+      options?: Array<{
+        id: string;
+        text: string;
+        contentFormat?: 'markdown' | 'plate';
+        isCorrect: boolean;
+      }>;
+      correctAnswer?: any;
+      explanation?: string;
+      topicId?: string;
+      passageId?: string;
+      validationConfig?: object;
       contentFormat?: 'markdown' | 'plate';
-      isCorrect: boolean;
-    }>;
-    correctAnswer?: any;
-    explanation?: string;
-    topicId?: string;
-    passageId?: string;
-    validationConfig?: object;
-    contentFormat?: 'markdown' | 'plate';
-    discussions?: unknown[];
-  }) {
+      discussions?: unknown[];
+    },
+    adminId?: string,
+  ) {
     await this.validateQuestionCategory(dto.examTypeSubjectIds, dto.category);
     const etsList = await this.examTypeSubjectRepo.find({
       where: { id: In(dto.examTypeSubjectIds) },
@@ -508,6 +511,7 @@ export class AdminExamRevisionService {
       category: dto.category as QuestionCategory,
       difficulty: dto.difficulty as QuestionDifficulty,
       examTypeSubjects: etsList,
+      createdBy: adminId ?? null,
     });
     return this.questionRepo.save(q);
   }
@@ -558,7 +562,10 @@ export class AdminExamRevisionService {
     return { message: 'Deleted' };
   }
 
-  async bulkImportQuestions(questions: Array<Record<string, unknown>>) {
+  async bulkImportQuestions(
+    questions: Array<Record<string, unknown>>,
+    adminId?: string,
+  ) {
     const results: { created: number; errors: string[] } = {
       created: 0,
       errors: [],
@@ -591,6 +598,7 @@ export class AdminExamRevisionService {
           topicId: raw.topicId as string,
           passageId: raw.passageId as string,
           examTypeSubjects: etsList,
+          createdBy: adminId ?? null,
         });
         await this.questionRepo.save(q);
         results.created++;

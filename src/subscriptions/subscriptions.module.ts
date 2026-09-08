@@ -34,6 +34,9 @@ import { LoggerModule } from '../logger/logger.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { AffiliatesModule } from '../affiliates/affiliates.module';
 import { StudentsModule } from '../students/students.module';
+import { ExamsModule } from '../exams/exams.module';
+import { UsersModule } from '../users/users.module';
+import { SponsorsModule } from '../sponsors/sponsors.module';
 
 @Module({
   imports: [
@@ -53,6 +56,9 @@ import { StudentsModule } from '../students/students.module';
     AnalyticsModule,
     AffiliatesModule,
     forwardRef(() => StudentsModule),
+    forwardRef(() => SponsorsModule),
+    ExamsModule,
+    UsersModule,
   ],
   controllers: [SubscriptionsController, WebhooksController],
   providers: [

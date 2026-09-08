@@ -606,7 +606,23 @@ export class SponsorsService {
     const sponsorProfile = await this.findByUserId(sponsorUserId);
     if (!sponsorProfile)
       throw new NotFoundException('Sponsor profile not found');
-    return this.subscriptionsService.getGivebackPageStats(sponsorProfile.id);
+
+    const givebacks = await this.givebackRepo.find({
+      where: { sponsorId: sponsorProfile.id },
+      select: ['id', 'status'],
+    });
+
+    const givebackIds = givebacks.map((g) => g.id);
+    const [activatedIds, totalStudents] = await Promise.all([
+      this.subscriptionsService.getActivatedGivebackIds(givebackIds),
+      this.subscriptionsService.countSponsoredStudentsByGivebacks(givebackIds),
+    ]);
+
+    return {
+      totalGivebacks: givebacks.length,
+      activeGivebacks: activatedIds.size,
+      totalStudentsSponsored: totalStudents,
+    };
   }
 
   async getGivebacks(
@@ -619,12 +635,33 @@ export class SponsorsService {
     if (!sponsorProfile)
       throw new NotFoundException('Sponsor profile not found');
 
-    return this.subscriptionsService.getSponsoredGivebacks(
-      sponsorProfile.id,
-      page,
-      limit,
-      status,
-    );
+    const where: Record<string, unknown> = { sponsorId: sponsorProfile.id };
+    if (status) where.status = status;
+
+    const [items, total] = await this.givebackRepo.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const givebackIds = items.map((g) => g.id);
+    const [activatedIds, studentCounts] = await Promise.all([
+      this.subscriptionsService.getActivatedGivebackIds(givebackIds),
+      Promise.all(
+        givebackIds.map((id) =>
+          this.subscriptionsService.countSponsoredStudentsByGivebacks([id]),
+        ),
+      ),
+    ]);
+
+    const enriched = items.map((g, i) => ({
+      ...g,
+      isActivated: activatedIds.has(g.id),
+      studentsCount: studentCounts[i],
+    }));
+
+    return { items: enriched, total, page };
   }
 
   async getGivebackDetail(sponsorUserId: string, givebackId: string) {
@@ -632,12 +669,17 @@ export class SponsorsService {
     if (!sponsorProfile)
       throw new NotFoundException('Sponsor profile not found');
 
-    const detail = await this.subscriptionsService.getGivebackDetail(
-      sponsorProfile.id,
-      givebackId,
-    );
-    if (!detail) throw new NotFoundException('Giveback not found');
-    return detail;
+    const giveback = await this.givebackRepo.findOne({
+      where: { id: givebackId, sponsorId: sponsorProfile.id },
+    });
+    if (!giveback) throw new NotFoundException('Giveback not found');
+
+    const subscriptions =
+      await this.subscriptionsService.findSubscriptionsByGivebackId(givebackId, {
+        includeUser: true,
+      });
+
+    return { giveback, subscriptions };
   }
 
   /**
@@ -1307,9 +1349,75 @@ export class SponsorsService {
     const sponsorProfile = await this.findByUserId(sponsorUserId);
     if (!sponsorProfile)
       throw new NotFoundException('Sponsor profile not found');
-    return this.subscriptionsService.getExpiringSoonGivebacks(
-      sponsorProfile.id,
+
+    const now = new Date();
+    const in10Days = new Date(now.getTime() + 10 * DAY_MS);
+
+    const expiringGivebacks = await this.givebackRepo.find({
+      where: {
+        sponsorId: sponsorProfile.id,
+        status: GivebackStatus.ACTIVE,
+        hasResubbed: false,
+        endDate: Between(now, in10Days),
+      },
+      order: { endDate: 'ASC' },
+    });
+
+    if (!expiringGivebacks.length) return [];
+
+    return Promise.all(
+      expiringGivebacks.map(async (gb) => {
+        const subs =
+          await this.subscriptionsService.findActiveSubsByGivebackId(gb.id, {
+            includeUser: true,
+            orderByEndDate: true,
+          });
+        return { ...gb, subscriptions: subs, earliestExpiry: gb.endDate };
+      }),
     );
+  }
+
+  // ─── Giveback helpers (called by SubscriptionsService via SoC boundary) ─────
+
+  async findGivebackById(id: string): Promise<Giveback | null> {
+    return this.givebackRepo.findOne({ where: { id } });
+  }
+
+  async setGivebackActive(id: string, endDate?: Date | null): Promise<void> {
+    await this.givebackRepo.update(id, {
+      status: GivebackStatus.ACTIVE,
+      ...(endDate !== undefined ? { endDate } : {}),
+    });
+  }
+
+  /** Activate all PENDING subscriptions linked to a sponsor giveback. Returns activated count. */
+  async activateGivebackSubscriptions(givebackId: string): Promise<number> {
+    const giveback = await this.givebackRepo.findOne({ where: { id: givebackId } });
+    if (!giveback) return 0;
+
+    if (giveback.status === GivebackStatus.ACTIVE) {
+      const existing =
+        await this.subscriptionsService.findSubscriptionsByGivebackId(givebackId);
+      return existing.length;
+    }
+
+    const subscriptions =
+      await this.subscriptionsService.findSubscriptionsByGivebackId(givebackId);
+    let count = 0;
+    for (const sub of subscriptions) {
+      try {
+        await this.subscriptionsService.activateSubscription(sub.id);
+        count++;
+      } catch {
+        // Don't fail the whole batch for one student
+      }
+    }
+
+    const firstActivated =
+      await this.subscriptionsService.findFirstActivatedSubForGiveback(givebackId);
+    await this.setGivebackActive(givebackId, firstActivated?.endDate);
+
+    return count;
   }
 
   // ─── Giveback queries (own givebackRepo — no cross-module entity access) ────

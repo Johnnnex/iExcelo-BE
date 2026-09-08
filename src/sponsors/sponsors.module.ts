@@ -25,8 +25,8 @@ import { AffiliatesModule } from '../affiliates/affiliates.module';
     BullModule.registerQueue({ name: EMAILS_QUEUE }),
     LoggerModule,
     UsersModule,
-    forwardRef(() => StudentsModule), // StudentsModule → SubscriptionsModule (no cycle, forwardRef just in case)
-    SubscriptionsModule,
+    forwardRef(() => StudentsModule),
+    forwardRef(() => SubscriptionsModule),
     AffiliatesModule,
   ],
   controllers: [SponsorsController],

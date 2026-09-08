@@ -1,8 +1,8 @@
 import { DataSource } from 'typeorm';
 import { IMigration } from '../migration-runner';
 
-export const migration012: IMigration = {
-  name: '012-disable-post-jamb-sat',
+export const migration011: IMigration = {
+  name: '011-disable-post-jamb-sat',
   description:
     'Deactivates POST-JAMB and SAT exam types; removes their ExamTypeSubject links. Subjects remain for future wiring from admin dashboard.',
   async run(dataSource: DataSource): Promise<void> {

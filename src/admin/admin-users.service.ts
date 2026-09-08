@@ -12,6 +12,7 @@ import { StudentProfile } from '../students/entities/student-profile.entity';
 import { SponsorProfile } from '../sponsors/entities/sponsor-profile.entity';
 import { AffiliateProfile } from '../affiliates/entities/affiliate-profile.entity';
 import { AffiliatePayout } from '../affiliates/entities/affiliate-payout.entity';
+import { AffiliatesService } from '../affiliates/affiliates.service';
 import { User } from '../users/entities/user.entity';
 import { PasswordResetToken } from '../auth/entities/password-reset-tokens.entity';
 import { EMAILS_QUEUE, EmailJobs } from '../email/queue/email.queue';
@@ -28,6 +29,7 @@ export class AdminUsersService {
     private affiliateProfileRepo: Repository<AffiliateProfile>,
     @InjectRepository(AffiliatePayout)
     private affiliatePayoutRepo: Repository<AffiliatePayout>,
+    private affiliatesService: AffiliatesService,
     @InjectRepository(User)
     private userRepo: Repository<User>,
     @InjectRepository(PasswordResetToken)
@@ -300,17 +302,11 @@ export class AdminUsersService {
     payout.processedAt = new Date();
     await this.affiliatePayoutRepo.save(payout);
 
-    // Reflect in profile
-    const profile = await this.affiliateProfileRepo.findOne({
-      where: { id: payout.affiliateId },
-    });
-    if (profile) {
-      profile.pendingBalance = Math.max(
-        0,
-        profile.pendingBalance - payout.amount,
-      );
-      await this.affiliateProfileRepo.save(profile);
-    }
+    await this.affiliatesService.markCommissionsAsPaidForPayout(
+      payout.affiliateId,
+      payout.currency,
+      payout.amount,
+    );
 
     return { message: 'Payout approved' };
   }

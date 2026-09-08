@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import { WebhookEvent } from '../entities';
 import { SubscriptionsService } from '../subscriptions.service';
 import { TransactionsService } from './transactions.service';
+import { SponsorsService } from '../../sponsors/sponsors.service';
 import { LoggerService } from '../../logger/logger.service';
 import {
   PaymentProvider,
@@ -26,6 +27,7 @@ export class WebhookService {
     private webhookEventRepo: Repository<WebhookEvent>,
     private subscriptionsService: SubscriptionsService,
     private transactionsService: TransactionsService,
+    private sponsorsService: SponsorsService,
     private loggerService: LoggerService,
     private configService: ConfigService,
   ) {}
@@ -572,7 +574,7 @@ export class WebhookService {
    */
   async handleGivebackCheckoutCompleted(givebackId: string): Promise<void> {
     const count =
-      await this.subscriptionsService.activateGivebackSubscriptions(givebackId);
+      await this.sponsorsService.activateGivebackSubscriptions(givebackId);
     this.logger.log(
       `Giveback ${givebackId}: ${count} subscription(s) activated via webhook fallback`,
     );
