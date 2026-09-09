@@ -1078,7 +1078,9 @@ export class AffiliatesService {
       remaining -= c.amount;
     }
     if (toMarkPaid.length > 0) {
-      await this.commissionRepo.update(toMarkPaid, { status: CommissionStatus.PAID });
+      await this.commissionRepo.update(toMarkPaid, {
+        status: CommissionStatus.PAID,
+      });
     }
   }
 }

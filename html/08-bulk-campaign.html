@@ -5,14 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
   <meta name="supported-color-schemes" content="light dark" />
-  <title>Complete Your Setup</title>
+  <title>{{categoryLabel}}</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <style>
-    /* Geist: self-hosted on R2 */
     @font-face {
       font-family: 'Geist';
       font-style: normal;
@@ -48,7 +47,6 @@
       .body-pad    { padding: 28px 20px !important; }
       .hdr-label   { display: none !important; }
     }
-    a.cta-btn:hover { opacity: 0.88; }
 
     @media (prefers-color-scheme: dark) {
       .outer-bg     { background-color: #111111 !important; }
@@ -57,9 +55,9 @@
       .body-text    { color: #e5e5ea !important; }
       .body-sub     { color: #aeaeb2 !important; }
       .body-strong  { color: #ffffff !important; }
-      .link-block   { background-color: #111e2e !important; border-color: #1e3a5f !important; }
-      .link-text    { color: #60a5fa !important; }
-      .step-text    { color: #aeaeb2 !important; }
+      .pill-bg      { background-color: #111e2e !important; border-color: #1e3a5f !important; }
+      .pill-label   { color: #60a5fa !important; }
+      .content-cell { color: #aeaeb2 !important; }
       .divider      { border-color: rgba(255,255,255,0.10) !important; }
     }
 
@@ -69,9 +67,9 @@
     [data-ogsc] .body-text    { color: #e5e5ea !important; }
     [data-ogsc] .body-sub     { color: #aeaeb2 !important; }
     [data-ogsc] .body-strong  { color: #ffffff !important; }
-    [data-ogsc] .link-block   { background-color: #111e2e !important; border-color: #1e3a5f !important; }
-    [data-ogsc] .link-text    { color: #60a5fa !important; }
-    [data-ogsc] .step-text    { color: #aeaeb2 !important; }
+    [data-ogsc] .pill-bg      { background-color: #111e2e !important; border-color: #1e3a5f !important; }
+    [data-ogsc] .pill-label   { color: #60a5fa !important; }
+    [data-ogsc] .content-cell { color: #aeaeb2 !important; }
     [data-ogsc] .divider      { border-color: rgba(255,255,255,0.10) !important; }
   </style>
 </head>
@@ -107,7 +105,7 @@
                   </td>
                   <td class="hdr-label" align="right" style="padding:26px 40px 22px;" valign="middle">
                     <span style="font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;font-size:11px;font-weight:600;color:rgba(255,255,255,0.28);text-transform:uppercase;letter-spacing:2px;white-space:nowrap;">
-                      Account Setup
+                      {{categoryLabel}}
                     </span>
                   </td>
                 </tr>
@@ -124,100 +122,35 @@
                 Hi {{name}},
               </p>
 
-              <!-- Intro -->
-              <p class="body-sub" style="margin:0 0 8px;font-size:15px;font-weight:400;color:#444444;line-height:1.85;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
-                Thanks for signing in with Google! Your iExcelo account is almost ready. Complete a quick setup to unlock your personalised dashboard.
+              <!-- Category pill -->
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px;">
+                <tr>
+                  <td class="pill-bg" style="background-color:#f4f4f4;border-radius:20px;padding:5px 16px;border:1px solid #e0e0e0;">
+                    <span class="pill-label" style="font-size:12px;font-weight:700;color:#007FFF;letter-spacing:0.8px;text-transform:uppercase;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
+                      {{categoryLabel}}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Admin-composed content -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
+                <tr>
+                  <td class="content-cell body-sub" style="font-size:15px;color:#444444;line-height:1.8;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
+                    {{htmlContent}}
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Divider -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px;">
+                <tr><td class="divider" style="border-top:1px solid #F2F4F7;font-size:0;line-height:0;">&nbsp;</td></tr>
+              </table>
+
+              <!-- Unsubscribe note -->
+              <p class="body-sub" style="margin:0 0 40px;font-size:13px;color:#98A2B3;line-height:1.6;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
+                You're receiving this email because you have an active iExcelo account and opted into <strong>{{categoryLabel}}</strong> emails. Visit your <a href="{{settingsUrl}}" style="color:#007FFF;text-decoration:none;">notification settings</a> to manage your email preferences.
               </p>
-
-              <p class="body-sub" style="margin:0 0 32px;font-size:15px;font-weight:400;color:#444444;line-height:1.85;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
-                It only takes a minute.
-              </p>
-
-              <!-- CTA -->
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 32px;">
-                <tr>
-                  <td align="center">
-                    <table cellpadding="0" cellspacing="0" role="presentation">
-                      <tr>
-                        <td style="background-color:#007FFF;border-radius:8px;">
-                          <a class="cta-btn" href="{{onboardingUrl}}" style="display:inline-block;padding:15px 44px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;letter-spacing:0.2px;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
-                            Complete My Setup
-                          </a>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Fallback link -->
-              <p class="body-sub" style="margin:0 0 10px;font-size:13px;color:#667085;line-height:1.6;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
-                Button not working? Paste this link into your browser:
-              </p>
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" class="link-block" style="background-color:#F0F7FF;border:1.5px solid #C8DEFF;border-radius:6px;margin:0 0 36px;">
-                <tr>
-                  <td style="padding:13px 16px;">
-                    <p class="link-text" style="margin:0;font-size:12px;color:#007FFF;word-break:break-all;line-height:1.65;font-family:'Courier New',Courier,monospace;">{{onboardingUrl}}</p>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- What happens next -->
-              <p style="margin:0 0 14px;font-size:11px;font-weight:700;color:#667085;text-transform:uppercase;letter-spacing:1.5px;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">What happens next</p>
-
-              <!-- Step 1 -->
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:10px;">
-                <tr>
-                  <td width="22" valign="top">
-                    <table cellpadding="0" cellspacing="0" role="presentation">
-                      <tr>
-                        <td width="22" height="22" align="center" valign="middle" style="width:22px;height:22px;background-color:#007FFF;border-radius:50%;font-size:11px;font-weight:800;color:#ffffff;line-height:22px;text-align:center;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
-                          1
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                  <td style="padding-left:12px;" valign="middle">
-                    <p class="step-text" style="margin:0;font-size:14px;color:#444444;line-height:1.6;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">Click the button above to open your setup page</p>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Step 2 -->
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:10px;">
-                <tr>
-                  <td width="22" valign="top">
-                    <table cellpadding="0" cellspacing="0" role="presentation">
-                      <tr>
-                        <td width="22" height="22" align="center" valign="middle" style="width:22px;height:22px;background-color:#007FFF;border-radius:50%;font-size:11px;font-weight:800;color:#ffffff;line-height:22px;text-align:center;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
-                          2
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                  <td style="padding-left:12px;" valign="middle">
-                    <p class="step-text" style="margin:0;font-size:14px;color:#444444;line-height:1.6;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">Choose your account type and set your preferences</p>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Step 3 -->
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:40px;">
-                <tr>
-                  <td width="22" valign="top">
-                    <table cellpadding="0" cellspacing="0" role="presentation">
-                      <tr>
-                        <td width="22" height="22" align="center" valign="middle" style="width:22px;height:22px;background-color:#007FFF;border-radius:50%;font-size:11px;font-weight:800;color:#ffffff;line-height:22px;text-align:center;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
-                          3
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                  <td style="padding-left:12px;" valign="middle">
-                    <p class="step-text" style="margin:0;font-size:14px;color:#444444;line-height:1.6;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">Start your learning journey on iExcelo</p>
-                  </td>
-                </tr>
-              </table>
 
               <!-- Sign-off -->
               <p class="body-sub" style="margin:0;font-size:15px;color:#444444;line-height:1.75;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">

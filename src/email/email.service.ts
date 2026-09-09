@@ -70,7 +70,6 @@ export class EmailService {
     const onboardingUrl = `${frontendUrl}/auth/onboarding?token=${onboardingToken}`;
     const { subject, html } = getOnboardingEmailTemplate({
       firstName,
-      lastName,
       onboardingUrl,
     });
     await this.transporter.sendMail({
@@ -156,10 +155,11 @@ export class EmailService {
     lastName: string,
     userType?: string,
   ) {
+    const frontendUrl = this.configService.get('FRONTEND_URL');
     const { subject, html } = getWelcomeEmailTemplate({
       firstName,
-      lastName,
       userType,
+      dashboardUrl: `${frontendUrl}/dashboard`,
     });
     await this.transporter.sendMail({
       from: this.from,
@@ -205,10 +205,12 @@ export class EmailService {
     htmlContent: string,
     category: CampaignCategory = CampaignCategory.NEWSLETTER,
   ) {
+    const frontendUrl = this.configService.get('FRONTEND_URL');
     const { html } = getBulkCampaignEmailTemplate({
       firstName,
       htmlContent,
       category,
+      settingsUrl: `${frontendUrl}/student/settings/notification`,
     });
     await this.transporter.sendMail({ from: this.from, to, subject, html });
   }

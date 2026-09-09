@@ -44,7 +44,6 @@ function write(filename: string, html: string) {
 (() => {
   const { html } = getOnboardingEmailTemplate({
     firstName: 'Femi',
-    lastName: 'Adeyemi',
     onboardingUrl: 'https://iexcelo.com/auth/onboarding?token=SAMPLE_TOKEN',
   });
   write('03-onboarding.html', html);
@@ -116,8 +115,8 @@ function write(filename: string, html: string) {
 (() => {
   const { html } = getWelcomeEmailTemplate({
     firstName: 'David',
-    lastName: 'Nwosu',
     userType: 'student',
+    dashboardUrl: 'https://iexcelo.com/dashboard',
   });
   write('07a-welcome-student.html', html);
 })();
@@ -126,8 +125,8 @@ function write(filename: string, html: string) {
 (() => {
   const { html } = getWelcomeEmailTemplate({
     firstName: 'Patricia',
-    lastName: 'Eze',
     userType: 'sponsor',
+    dashboardUrl: 'https://iexcelo.com/dashboard',
   });
   write('07b-welcome-sponsor.html', html);
 })();
@@ -136,8 +135,8 @@ function write(filename: string, html: string) {
 (() => {
   const { html } = getWelcomeEmailTemplate({
     firstName: 'Samuel',
-    lastName: 'Bello',
     userType: 'affiliate',
+    dashboardUrl: 'https://iexcelo.com/dashboard',
   });
   write('07c-welcome-affiliate.html', html);
 })();
@@ -147,8 +146,9 @@ function write(filename: string, html: string) {
   const { html } = getBulkCampaignEmailTemplate({
     firstName: 'Chioma',
     category: CampaignCategory.NEWSLETTER,
+    settingsUrl: 'https://iexcelo.com/student/settings/notification',
     htmlContent: /* html */ `
-      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#1a1a1a;">Weekly Digest — Top Resources &amp; Platform News</h2>
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#1a1a1a;">Weekly Digest: Top Resources &amp; Platform News</h2>
       <p style="margin:0 0 16px;line-height:1.8;">
         Here's what's new on iExcelo this week: we've added 200+ new WAEC Chemistry questions,
         improved our analytics dashboard, and our new mock exam timer is live.
@@ -166,16 +166,17 @@ function write(filename: string, html: string) {
   const { html } = getBulkCampaignEmailTemplate({
     firstName: 'Chioma',
     category: CampaignCategory.SECURITY_ALERTS,
+    settingsUrl: 'https://iexcelo.com/student/settings/notification',
     htmlContent: /* html */ `
       <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#1a1a1a;">Important Platform Security Notice</h2>
       <p style="margin:0 0 16px;line-height:1.8;">
         We want to inform all iExcelo users of an important security advisory.
-        We are rolling out enhanced two-factor authentication controls — we recommend enabling
+        We are rolling out enhanced two-factor authentication controls. We recommend enabling
         2FA in your security settings.
       </p>
       <p style="margin:0;line-height:1.8;">
         If you notice any suspicious activity on your account, please contact us immediately at
-        <a href="mailto:security@iexcelo.com" style="color:#D42620;">security@iexcelo.com</a>.
+        <a href="mailto:security@iexcelo.com" style="color:#007FFF;">security@iexcelo.com</a>.
       </p>
     `,
   });
