@@ -14,7 +14,7 @@ import {
   ANALYTICS_QUEUE,
   AnalyticsJobs,
 } from '../analytics/queue/analytics.queue';
-import { Repository, Not, LessThan, MoreThan, Between, In } from 'typeorm';
+import { Repository, Not, LessThan, MoreThan, In } from 'typeorm';
 import {
   Subscription,
   SubscriptionPlan,
@@ -265,7 +265,9 @@ export class SubscriptionsService {
             referral.affiliateId,
           );
           if (affiliateProfile) {
-            const affiliateUser = await this.usersService.findById(affiliateProfile.userId);
+            const affiliateUser = await this.usersService.findById(
+              affiliateProfile.userId,
+            );
 
             if (affiliateUser && affiliateUser.role !== UserType.SPONSOR) {
               // If affiliate is a student, they must have subscribed before to earn commissions
@@ -760,7 +762,9 @@ export class SubscriptionsService {
   }
 
   /** Count distinct students sponsored across the given givebackIds. */
-  async countSponsoredStudentsByGivebacks(givebackIds: string[]): Promise<number> {
+  async countSponsoredStudentsByGivebacks(
+    givebackIds: string[],
+  ): Promise<number> {
     if (!givebackIds.length) return 0;
     const row = await this.subscriptionRepo
       .createQueryBuilder('s')
@@ -1082,7 +1086,9 @@ export class SubscriptionsService {
               referral.affiliateId,
             );
             if (affiliateProfile) {
-              const affiliateUser = await this.usersService.findById(affiliateProfile.userId);
+              const affiliateUser = await this.usersService.findById(
+                affiliateProfile.userId,
+              );
 
               if (affiliateUser && affiliateUser.role !== UserType.SPONSOR) {
                 // If affiliate is a student, they must have subscribed before to earn commissions

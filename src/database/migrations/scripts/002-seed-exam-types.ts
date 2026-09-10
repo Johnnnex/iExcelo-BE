@@ -65,6 +65,7 @@ export const migration002: IMigration = {
         .getOne();
 
       // skipEts: subject is seeded but NOT linked to this exam type
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if ((data as any).skipEts) {
         // Ensure the Subject exists but skip (and remove) any ETS link
         let subject = await subjectRepo
@@ -84,7 +85,9 @@ export const migration002: IMigration = {
         // Remove any stale ETS link that might exist
         if (existingEts) {
           await etsRepo.remove(existingEts);
-          console.log(`      - Removed ETS: ${data.examTypeName} / ${data.name}`);
+          console.log(
+            `      - Removed ETS: ${data.examTypeName} / ${data.name}`,
+          );
         }
         continue;
       }
