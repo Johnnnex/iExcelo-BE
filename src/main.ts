@@ -31,8 +31,31 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // ========== CORS ==========
+  const allowedOrigins = [
+    configService.get<string>('FRONTEND_URL') ?? '',
+    configService.get<string>('ADMIN_URL') ?? '',
+  ]
+    .filter(Boolean)
+    .map((u) => u.replace(/\/$/, '')); // strip trailing slashes
+
+  if (allowedOrigins.length === 0) {
+    logger.warn(
+      'No FRONTEND_URL or ADMIN_URL set -- CORS will block all browser requests',
+    );
+  } else {
+    logger.log(`CORS allowed origins: ${allowedOrigins.join(', ')}`);
+  }
+
   app.enableCors({
-    origin: [configService.get('FRONTEND_URL'), configService.get('ADMIN_URL')],
+    origin(
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) {
+      // Allow server-to-server / Postman requests (no origin header)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin "${origin}" not allowed`));
+    },
     credentials: true,
   });
 
