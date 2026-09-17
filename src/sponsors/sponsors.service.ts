@@ -675,9 +675,12 @@ export class SponsorsService {
     if (!giveback) throw new NotFoundException('Giveback not found');
 
     const subscriptions =
-      await this.subscriptionsService.findSubscriptionsByGivebackId(givebackId, {
-        includeUser: true,
-      });
+      await this.subscriptionsService.findSubscriptionsByGivebackId(
+        givebackId,
+        {
+          includeUser: true,
+        },
+      );
 
     return { giveback, subscriptions };
   }
@@ -1367,11 +1370,13 @@ export class SponsorsService {
 
     return Promise.all(
       expiringGivebacks.map(async (gb) => {
-        const subs =
-          await this.subscriptionsService.findActiveSubsByGivebackId(gb.id, {
+        const subs = await this.subscriptionsService.findActiveSubsByGivebackId(
+          gb.id,
+          {
             includeUser: true,
             orderByEndDate: true,
-          });
+          },
+        );
         return { ...gb, subscriptions: subs, earliestExpiry: gb.endDate };
       }),
     );
@@ -1392,12 +1397,16 @@ export class SponsorsService {
 
   /** Activate all PENDING subscriptions linked to a sponsor giveback. Returns activated count. */
   async activateGivebackSubscriptions(givebackId: string): Promise<number> {
-    const giveback = await this.givebackRepo.findOne({ where: { id: givebackId } });
+    const giveback = await this.givebackRepo.findOne({
+      where: { id: givebackId },
+    });
     if (!giveback) return 0;
 
     if (giveback.status === GivebackStatus.ACTIVE) {
       const existing =
-        await this.subscriptionsService.findSubscriptionsByGivebackId(givebackId);
+        await this.subscriptionsService.findSubscriptionsByGivebackId(
+          givebackId,
+        );
       return existing.length;
     }
 
@@ -1414,7 +1423,9 @@ export class SponsorsService {
     }
 
     const firstActivated =
-      await this.subscriptionsService.findFirstActivatedSubForGiveback(givebackId);
+      await this.subscriptionsService.findFirstActivatedSubForGiveback(
+        givebackId,
+      );
     await this.setGivebackActive(givebackId, firstActivated?.endDate);
 
     return count;

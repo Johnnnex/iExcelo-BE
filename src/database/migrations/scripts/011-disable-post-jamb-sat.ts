@@ -22,6 +22,8 @@ export const migration011: IMigration = {
        )
     `);
 
-    console.log('    POST-JAMB and SAT exam types deactivated; ETS links removed.');
+    console.log(
+      '    POST-JAMB and SAT exam types deactivated; ETS links removed.',
+    );
   },
 };

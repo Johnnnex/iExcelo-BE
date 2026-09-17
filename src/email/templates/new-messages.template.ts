@@ -70,7 +70,9 @@ export function getNewMessagesEmailTemplate(params: {
     html: loadTemplate('05b-new-messages-batch.html', {
       name: firstName,
       messageCount: messages.length.toString(),
-      messageRows: messages.map((m) => buildMessageRow(m, frontendUrl)).join('\n'),
+      messageRows: messages
+        .map((m) => buildMessageRow(m, frontendUrl))
+        .join('\n'),
       messagesUrl,
     }),
   };

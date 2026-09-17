@@ -1,8 +1,8 @@
 import { loadTemplate } from './load-template.util.js';
 
 const FILE_MAP: Record<string, string> = {
-  student:   '07a-welcome-student.html',
-  sponsor:   '07b-welcome-sponsor.html',
+  student: '07a-welcome-student.html',
+  sponsor: '07b-welcome-sponsor.html',
   affiliate: '07c-welcome-affiliate.html',
 };
 
