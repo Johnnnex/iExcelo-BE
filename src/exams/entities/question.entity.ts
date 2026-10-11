@@ -1,6 +1,7 @@
 import {
   Entity,
   Column,
+  Index,
   ManyToOne,
   JoinColumn,
   ManyToMany,
@@ -86,6 +87,7 @@ export class Question extends BaseEntity {
 
   // Which category of the exam this question belongs to.
   // Must be one of the exam type's supportedCategories.
+  @Index()
   @Column({
     type: 'enum',
     enum: Object.values(QuestionCategory),

@@ -243,12 +243,14 @@ export class StudentsService {
     const etsCounts: Array<{
       etsId: string;
       total: number;
+      theoryCount: number;
       practicalCount: number;
     }> =
       etsIds.length > 0
         ? await this.studentProfileRepo.manager.query(
             `SELECT qets."examTypeSubjectId" AS "etsId",
                     COUNT(DISTINCT q.id)::int AS total,
+                    SUM(CASE WHEN q.category = 'theory' THEN 1 ELSE 0 END)::int AS "theoryCount",
                     SUM(CASE WHEN q.category = 'practical' THEN 1 ELSE 0 END)::int AS "practicalCount"
              FROM questions q
              INNER JOIN question_exam_type_subjects qets ON qets."questionId" = q.id
@@ -260,13 +262,17 @@ export class StudentsService {
     const etsCountMap = new Map(
       etsCounts.map((r) => [
         r.etsId,
-        { total: Number(r.total), practicalCount: Number(r.practicalCount) },
+        {
+          total: Number(r.total),
+          theoryCount: Number(r.theoryCount),
+          practicalCount: Number(r.practicalCount),
+        },
       ]),
     );
     const questionCountMap = new Map(
       etsRecords.map((e) => [
         e.subjectId,
-        etsCountMap.get(e.id) ?? { total: 0, practicalCount: 0 },
+        etsCountMap.get(e.id) ?? { total: 0, theoryCount: 0, practicalCount: 0 },
       ]),
     );
 
@@ -292,13 +298,21 @@ export class StudentsService {
         totalWrong: string;
       }>();
 
-    // Per-subject: count unique questions practiced per subject (for "Math: 12/40" display)
+    // Per-subject: count unique questions practiced per subject, broken down by category
     const subjectProgressRows =
       selectedSubjects.length > 0
         ? await this.questionProgressRepo
             .createQueryBuilder('qp')
             .select('ets."subjectId"', 'subjectId')
             .addSelect('COUNT(DISTINCT qp."questionId")', 'count')
+            .addSelect(
+              `COUNT(DISTINCT CASE WHEN q.category = 'theory' THEN qp."questionId" END)`,
+              'theoryAttempted',
+            )
+            .addSelect(
+              `COUNT(DISTINCT CASE WHEN q.category = 'practical' THEN qp."questionId" END)`,
+              'practicalAttempted',
+            )
             .innerJoin('questions', 'q', 'q.id = qp."questionId"')
             .innerJoin(
               'question_exam_type_subjects',
@@ -315,31 +329,33 @@ export class StudentsService {
               examTypeId: resolvedExamTypeId,
             })
             .groupBy('ets."subjectId"')
-            .getRawMany<{ subjectId: string; count: string }>()
+            .getRawMany<{
+              subjectId: string;
+              count: string;
+              theoryAttempted: string;
+              practicalAttempted: string;
+            }>()
         : [];
     const subjectProgressMap = new Map(
-      subjectProgressRows.map((r) => [r.subjectId, parseInt(r.count, 10)]),
+      subjectProgressRows.map((r) => [
+        r.subjectId,
+        {
+          count: parseInt(r.count, 10),
+          theoryAttempted: parseInt(r.theoryAttempted, 10),
+          practicalAttempted: parseInt(r.practicalAttempted, 10),
+        },
+      ]),
     );
 
-    // Count unique questions practiced via question_progress (joins through question_exam_type_subjects)
-    const totalQuestionsSolved = await this.questionProgressRepo
-      .createQueryBuilder('qp')
-      .innerJoin('questions', 'q', 'q.id = qp."questionId"')
-      .innerJoin(
-        'question_exam_type_subjects',
-        'qets',
-        'qets."questionId" = q.id',
-      )
-      .innerJoin(
-        'exam_type_subjects',
-        'ets',
-        'ets.id = qets."examTypeSubjectId"',
-      )
-      .where('qp."studentId" = :studentId', { studentId: student.id })
-      .andWhere('ets."examTypeId" = :examTypeId', {
-        examTypeId: resolvedExamTypeId,
-      })
-      .getCount();
+    // Derive totals from per-subject data (covers all subjects for the exam type)
+    let totalQuestionsSolved = 0;
+    let theoryQuestionsSolved = 0;
+    let practicalQuestionsSolved = 0;
+    for (const v of subjectProgressMap.values()) {
+      totalQuestionsSolved += v.count;
+      theoryQuestionsSolved += v.theoryAttempted;
+      practicalQuestionsSolved += v.practicalAttempted;
+    }
 
     const totalExamsCompleted = parseInt(
       examTypeStatsRaw?.totalExams ?? '0',
@@ -454,13 +470,18 @@ export class StudentsService {
         id: s.subject.id,
         name: s.subject.name,
         totalQuestions: questionCountMap.get(s.subject.id)?.total ?? 0,
+        theoryCount: questionCountMap.get(s.subject.id)?.theoryCount ?? 0,
         practicalCount: questionCountMap.get(s.subject.id)?.practicalCount ?? 0,
-        questionsAttempted: subjectProgressMap.get(s.subject.id) ?? 0,
+        questionsAttempted: subjectProgressMap.get(s.subject.id)?.count ?? 0,
+        theoryAttempted: subjectProgressMap.get(s.subject.id)?.theoryAttempted ?? 0,
+        practicalAttempted: subjectProgressMap.get(s.subject.id)?.practicalAttempted ?? 0,
       })),
       stats: {
         totalExamsCompleted,
         totalSubjectsSelected: selectedSubjects.length,
         totalQuestionsSolved,
+        theoryQuestionsSolved,
+        practicalQuestionsSolved,
         totalCorrect,
         totalWrong,
         overallAccuracy,

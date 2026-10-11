@@ -513,7 +513,17 @@ export class AdminExamRevisionService {
       examTypeSubjects: etsList,
       createdBy: adminId ?? null,
     });
-    return this.questionRepo.save(q);
+    const saved = await this.questionRepo.save(q);
+    const uniqueSubjectIds = [...new Set(etsList.map((e) => e.subjectId))];
+    if (uniqueSubjectIds.length > 0) {
+      await this.subjectRepo
+        .createQueryBuilder()
+        .update(Subject)
+        .set({ totalQuestions: () => '"totalQuestions" + 1' })
+        .where('id IN (:...ids)', { ids: uniqueSubjectIds })
+        .execute();
+    }
+    return saved;
   }
 
   async updateQuestion(
@@ -556,9 +566,23 @@ export class AdminExamRevisionService {
   }
 
   async deleteQuestion(id: string) {
-    const q = await this.questionRepo.findOne({ where: { id } });
+    const q = await this.questionRepo.findOne({
+      where: { id },
+      relations: ['examTypeSubjects'],
+    });
     if (!q) throw new NotFoundException('Question not found');
+    const uniqueSubjectIds = [
+      ...new Set(q.examTypeSubjects.map((e) => e.subjectId)),
+    ];
     await this.questionRepo.remove(q);
+    if (uniqueSubjectIds.length > 0) {
+      await this.subjectRepo
+        .createQueryBuilder()
+        .update(Subject)
+        .set({ totalQuestions: () => 'GREATEST("totalQuestions" - 1, 0)' })
+        .where('id IN (:...ids)', { ids: uniqueSubjectIds })
+        .execute();
+    }
     return { message: 'Deleted' };
   }
 
@@ -601,6 +625,15 @@ export class AdminExamRevisionService {
           createdBy: adminId ?? null,
         });
         await this.questionRepo.save(q);
+        const bulkSubjectIds = [...new Set(etsList.map((e) => e.subjectId))];
+        if (bulkSubjectIds.length > 0) {
+          await this.subjectRepo
+            .createQueryBuilder()
+            .update(Subject)
+            .set({ totalQuestions: () => '"totalQuestions" + 1' })
+            .where('id IN (:...ids)', { ids: bulkSubjectIds })
+            .execute();
+        }
         results.created++;
       } catch (err) {
         results.errors.push(`Row ${i + 1}: ${(err as Error).message}`);
