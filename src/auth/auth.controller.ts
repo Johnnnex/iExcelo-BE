@@ -111,6 +111,16 @@ export class AuthController {
 
   // ========== Google OAuth ==========
 
+  @Get('google/connect-init')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async googleConnectInit(
+    @Req() req: Request & { user: User & { userId: string } },
+  ) {
+    const state = this.authService.generateConnectStateToken(req.user.userId);
+    return { success: true, state };
+  }
+
   @Public()
   @Get('google')
   @UseGuards(GoogleAuthGuard)

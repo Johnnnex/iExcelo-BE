@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
@@ -36,20 +36,28 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   ): Promise<any> {
     const { id, name, emails } = profile;
 
-    // The state param carries the logged-in user's userId for the connect flow.
-    // passport-google-oauth20 decodes the state for us into req.query.state.
-    const connectUserId: string | undefined =
-      req?.query?.state && req.query.state !== 'login'
-        ? (req.query.state as string)
-        : undefined;
+    // The state param carries a signed JWT for the connect flow.
+    // Verify the token before trusting the userId it contains.
+    const rawState = req?.query?.state as string | undefined;
+    let connectUserId: string | undefined;
+
+    if (rawState && rawState !== 'login') {
+      try {
+        connectUserId = this.authService.verifyConnectStateToken(rawState);
+      } catch {
+        return done(
+          new UnauthorizedException('Invalid or expired Google connect state'),
+          false,
+        );
+      }
+    }
 
     if (connectUserId) {
       // Connect flow: link this Google account to the already-authenticated user.
-      // We don't do email lookup — the user's identity is trusted from the state token.
       const result = await this.authService.connectGoogleToUser(
         connectUserId,
         id,
-        emails[0].value, // Store the Gmail address so we can display it in settings
+        emails[0].value,
       );
       return done(null, {
         _connectResult: result,

@@ -496,6 +496,30 @@ export class AuthService {
     return { message: 'Verification code resent successfully' };
   }
 
+  // Generate short-lived signed state token for Google connect flow
+  generateConnectStateToken(userId: string): string {
+    return this.jwtService.sign(
+      { sub: userId, purpose: 'google-connect' },
+      { secret: this.configService.get('JWT_SECRET'), expiresIn: '5m' },
+    );
+  }
+
+  // Verify and extract userId from a connect state token
+  verifyConnectStateToken(token: string): string {
+    let payload: { sub: string; purpose: string };
+    try {
+      payload = this.jwtService.verify(token, {
+        secret: this.configService.get('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired Google connect state');
+    }
+    if (payload.purpose !== 'google-connect') {
+      throw new UnauthorizedException('Invalid Google connect state');
+    }
+    return payload.sub;
+  }
+
   // Generate temporary exchange token for OAuth callback
   generateExchangeToken(userId: string): string {
     const payload: ExchangeTokenPayload = {
